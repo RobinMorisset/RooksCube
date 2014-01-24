@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <pthread.h>
 
-#define N 5
+#define N 6
 #define N_BITFIELD uint64_t
 // TODO: also define a type for the indexes to check whether char/int is more
 // efficient than size_t
@@ -125,7 +125,7 @@ void backtrack(struct Config *c, size_t i, size_t j) {
 
 #if R_OPTIM2
 	/* Optimisation: keep the slices sorted */
-	if (j == 0 && i >= 2 && c->proj_y_x[i-1] < c->proj_y_x[i-2]) {
+	if (i >= 2 && c->proj_y_x[i-1] > c->proj_y_x[i-2]) {
 		return;
 	}
 #endif
