@@ -3,11 +3,10 @@
 #include <stddef.h>
 #include <inttypes.h>
 
-#define N 7
-#define N_BITFIELD uint_fast8_t
+#define N 5
+#define N_BITFIELD uint64_t
 // TODO: also define a type for the indexes to check whether char/int is more
 // efficient than size_t
-
 
 struct Config {
 	char heights[N][N];
@@ -32,6 +31,7 @@ void backtrack(struct Config *, struct Config * b, size_t, size_t);
 void backtrack_pillar(struct Config *c, struct Config * b,
 		size_t i, size_t j, N_BITFIELD mask_x, N_BITFIELD mask_y,
 		size_t i2, size_t j2) {
+	size_t max_k;
 	N_BITFIELD mask_z;
 	N_BITFIELD forbidden_z = c->forbidden_z_x[i] | c->forbidden_z_y[j];
 	N_BITFIELD old_fzx, old_fzy, old_fyx, old_fyz, old_fxy, old_fxz;
@@ -44,8 +44,9 @@ void backtrack_pillar(struct Config *c, struct Config * b,
 	assert(i < N);
 	assert(j < N);
 	c->k++;
+	max_k = c->k < N ? c->k : N;
 
-	for (size_t k = 0; k < N; k++) {
+	for (size_t k = 0; k < max_k; k++) {
 		// First check that this height is allowed.
 		// Could be further optimised with the __builtin_ffsll
 		mask_z = 1 << k;
