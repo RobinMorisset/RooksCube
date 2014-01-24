@@ -28,7 +28,7 @@ struct Config {
 
 void backtrack(struct Config *, struct Config * b, size_t, size_t);
 
-void backtrack_pillar(struct Config *c, struct Config * b,
+inline void backtrack_pillar(struct Config *c, struct Config * b,
 		size_t i, size_t j, N_BITFIELD mask_x, N_BITFIELD mask_y,
 		size_t i2, size_t j2) {
 	size_t max_k;
