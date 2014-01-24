@@ -2,11 +2,16 @@
 #include <stdio.h>
 #include <stddef.h>
 #include <inttypes.h>
+#include <unistd.h>
+#include <pthread.h>
 
 #define N 5
 #define N_BITFIELD uint64_t
 // TODO: also define a type for the indexes to check whether char/int is more
 // efficient than size_t
+
+int counter = 0;
+int step_counter = 0;
 
 struct Config {
 	char heights[N][N];
@@ -28,13 +33,14 @@ struct Config {
 
 void backtrack(struct Config *, struct Config * b, size_t, size_t);
 
-inline void backtrack_pillar(struct Config *c, struct Config * b,
+void backtrack_pillar(struct Config *c, struct Config * b,
 		size_t i, size_t j, N_BITFIELD mask_x, N_BITFIELD mask_y,
 		size_t i2, size_t j2) {
 	size_t max_k;
 	N_BITFIELD mask_z;
-	N_BITFIELD forbidden_z = c->forbidden_z_x[i] | c->forbidden_z_y[j];
 	N_BITFIELD old_fzx, old_fzy, old_fyx, old_fyz, old_fxy, old_fxz;
+
+	N_BITFIELD forbidden_z = c->forbidden_z_x[i] | c->forbidden_z_y[j];
 
 	// Save to restore later
 	old_fzx = c->forbidden_z_x[i]; // TODO: save only once per slice
@@ -44,8 +50,11 @@ inline void backtrack_pillar(struct Config *c, struct Config * b,
 	assert(i < N);
 	assert(j < N);
 	c->k++;
+#if R_OPTIM1
 	max_k = c->k < N ? c->k : N;
-
+#else
+	max_k = N;
+#endif
 	for (size_t k = 0; k < max_k; k++) {
 		// First check that this height is allowed.
 		// Could be further optimised with the __builtin_ffsll
@@ -66,7 +75,7 @@ inline void backtrack_pillar(struct Config *c, struct Config * b,
 		c->proj_y_z[k] |= mask_y;
 		c->proj_y_x[i] |= mask_y;
 		c->proj_x_z[k] |= mask_x;
-		c->proj_x_y[i] |= mask_x;
+		c->proj_x_y[j] |= mask_x;
 		c->forbidden_z_x[i] |= c->proj_z_y[j];
 		c->forbidden_z_y[j] |= c->proj_z_x[i];
 		c->forbidden_y_x[i] |= c->proj_y_z[k];
@@ -106,22 +115,35 @@ void print_config(struct Config * c) {
 			else
 				printf("* ");
 		}
-		printf("\n");
+		printf(" -> %i\n", c->proj_y_x[i]);
 	}
-
-	printf("%i\n\n", c->k);
+	printf("result: %i\n\n", c->k);
 }
 
 void backtrack(struct Config *c, struct Config *b, size_t i, size_t j) {
 	int i2, j2;
-	N_BITFIELD mask_x, mask_y;
+	N_BITFIELD mask_x, mask_y, old_hpyx;
+
+	step_counter++;
+#if R_OPTIM2
+	/* Optimisation: keep the slices sorted */
+	if (j == 0 && i >= 2 && c->proj_y_x[i-1] < c->proj_y_x[i-2]) {
+		return;
+	}
+#endif
 
 	/* If we are beyond the end, stop */
 	if (i == N) {
 		if (c->k > b->k) {
 			*b = *c;
+#if ROOKS_PRINT
+			printf("----- BEST ! ----- %i\n", c->k);
 			print_config(c);
+#endif
 		}
+		counter++;
+		//printf("step_counter: %i\n", step_counter);
+		//print_config(c);
 		return;
 	}
 
@@ -142,10 +164,19 @@ void backtrack(struct Config *c, struct Config *b, size_t i, size_t j) {
 		backtrack(c, b, i2, j2);
 	else
 		backtrack_pillar(c, b, i, j, mask_x, mask_y, i2, j2);
+
+}
+
+void * monitor(void *c) {
+	for(;;) {
+		sleep(1);
+		print_config((struct Config *) c);
+	}
 }
 
 int main(int argc, char* argv[])
 {
+	pthread_t t;
 	struct Config c;
 	struct Config b;
 
@@ -170,14 +201,13 @@ int main(int argc, char* argv[])
 	c.k = 0;
 	b.k = 0;
 
-	/* Backtracking */
+
+#if ROOKS_MONITOR
+	pthread_create(&t, NULL, monitor, &c);
+#endif
+
 	backtrack(&c, &b, 0, 0);
 
-	print_config(&b);
-	printf("\n%i", b.k);
+	printf("%i", counter);
 	return 0;
 }
-// c->forbidden_z_x[i] |= c->proj_z_y[j];
-// c->forbidden_z_y[j] |= c->proj_z_x[i];
-// c->forbidden_y_x[i] |= c->proj_y_z[k];
-
