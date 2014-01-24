@@ -10,9 +10,6 @@
 // TODO: also define a type for the indexes to check whether char/int is more
 // efficient than size_t
 
-int counter = 0;
-int step_counter = 0;
-
 struct Config {
 	char heights[N][N];
 	// the index corresponds to x, the bitfield to a 'pillar' (z)
@@ -126,7 +123,6 @@ void backtrack(struct Config *c, size_t i, size_t j) {
 	size_t i2, j2;
 	N_BITFIELD mask_x, mask_y, old_hpyx;
 
-	step_counter++;
 #if R_OPTIM2
 	/* Optimisation: keep the slices sorted */
 	if (j == 0 && i >= 2 && c->proj_y_x[i-1] < c->proj_y_x[i-2]) {
@@ -147,11 +143,16 @@ void backtrack(struct Config *c, size_t i, size_t j) {
 			print_config(c);
 #endif
 		}
-		counter++;
-		//printf("step_counter: %i\n", step_counter);
-		//print_config(c);
 		return;
 	}
+
+#if R_OPTIM3
+	/* Optimisation: don't keep going if there is no chance of beating the record */
+	int max_slots = N*N;
+	int max_available_slots = max_slots - i*N - j;
+	if (c->k + max_available_slots <= c->best_k)
+		return;
+#endif
 
 	/* Getting the coordinates for the recursive call */
 	if (j == N - 1) {
@@ -215,6 +216,5 @@ int main(int argc, char* argv[])
 
 	backtrack(&c, 0, 0);
 
-	printf("%i", counter);
 	return 0;
 }
