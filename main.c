@@ -5,7 +5,6 @@
 #include <unistd.h>
 #include <pthread.h>
 
-#define N 6
 #define N_BITFIELD uint64_t
 // TODO: also define a type for the indexes to check whether char/int is more
 // efficient than size_t
