@@ -29,11 +29,13 @@ struct Config {
 	N_BITFIELD proj_x_y[N];
 	N_BITFIELD proj_x_z[N];
 	int k;
+	int best_k;
+	char best_heights[N][N];
 };
 
-void backtrack(struct Config *, struct Config * b, size_t, size_t);
+void backtrack(struct Config *, size_t, size_t);
 
-void backtrack_pillar(struct Config *c, struct Config * b,
+void backtrack_pillar(struct Config *c,
 		size_t i, size_t j, N_BITFIELD mask_x, N_BITFIELD mask_y,
 		size_t i2, size_t j2) {
 	size_t max_k;
@@ -84,7 +86,7 @@ void backtrack_pillar(struct Config *c, struct Config * b,
 		c->forbidden_x_z[k] |= c->proj_x_y[j];
 
 		// Recursive call to backtrack
-		backtrack(c, b, i2, j2);
+		backtrack(c, i2, j2);
 
 		// Restore old values
 		c->forbidden_z_x[i] = old_fzx;
@@ -104,7 +106,7 @@ void backtrack_pillar(struct Config *c, struct Config * b,
 	// Finally try leaving the pillar empty
 	c->heights[i][j] = 0;
 	c->k--;
-	backtrack(c, b, i2, j2);
+	backtrack(c, i2, j2);
 }
 
 void print_config(struct Config * c) {
@@ -120,8 +122,8 @@ void print_config(struct Config * c) {
 	printf("result: %i\n\n", c->k);
 }
 
-void backtrack(struct Config *c, struct Config *b, size_t i, size_t j) {
-	int i2, j2;
+void backtrack(struct Config *c, size_t i, size_t j) {
+	size_t i2, j2;
 	N_BITFIELD mask_x, mask_y, old_hpyx;
 
 	step_counter++;
@@ -134,8 +136,12 @@ void backtrack(struct Config *c, struct Config *b, size_t i, size_t j) {
 
 	/* If we are beyond the end, stop */
 	if (i == N) {
-		if (c->k > b->k) {
-			*b = *c;
+		if (c->k > c->best_k) {
+			for (size_t tmp_i = 0; tmp_i < N; tmp_i++) {
+				for (size_t tmp_j = 0; tmp_j < N; tmp_j++)
+					c->best_heights[tmp_i][tmp_j] = c->heights[tmp_i][tmp_j];
+			}
+			c->best_k = c->k;
 #if ROOKS_PRINT
 			printf("----- BEST ! ----- %i\n", c->k);
 			print_config(c);
@@ -161,9 +167,9 @@ void backtrack(struct Config *c, struct Config *b, size_t i, size_t j) {
 	assert(i < N);
 	assert(j < N);
 	if ((c->forbidden_y_x[i] & mask_y) || (c->forbidden_x_y[j] & mask_x))
-		backtrack(c, b, i2, j2);
+		backtrack(c, i2, j2);
 	else
-		backtrack_pillar(c, b, i, j, mask_x, mask_y, i2, j2);
+		backtrack_pillar(c, i, j, mask_x, mask_y, i2, j2);
 
 }
 
@@ -184,6 +190,7 @@ int main(int argc, char* argv[])
 	for (size_t i = 0; i < N; i++) {
 		for (size_t j = 0; j < N; j++) {
 			c.heights[i][j] = 0;
+			c.best_heights[i][j] = 0;
 		}
 		c.forbidden_z_x[i] = 0;
 		c.forbidden_z_y[i] = 0;
@@ -199,14 +206,14 @@ int main(int argc, char* argv[])
 		c.proj_x_z[i] = 0;
 	}
 	c.k = 0;
-	b.k = 0;
+	c.best_k = 0;
 
 
 #if ROOKS_MONITOR
 	pthread_create(&t, NULL, monitor, &c);
 #endif
 
-	backtrack(&c, &b, 0, 0);
+	backtrack(&c, 0, 0);
 
 	printf("%i", counter);
 	return 0;
