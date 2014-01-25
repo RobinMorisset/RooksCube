@@ -168,7 +168,8 @@ void backtrack_next(struct Config *c, size_t i, size_t j) {
 #endif
 
 #if R_OPTIM1
-	if((i < N - 1 && c->cardinal_x[i] == c->cardinal_x[i+1])) {
+	// TODO: optimise by switching to the next slice
+	if((i < N - 1 && c->cardinal_x[i] > c->cardinal_x[i+1])) {
 		return;
 	}
 #endif
