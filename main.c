@@ -174,8 +174,8 @@ void backtrack_next(struct Config *c, N_INDEX i, N_INDEX j) {
 #if R_OPTIM2
 	/* Keep co-slices sorted */
 	if (j < N - 1 && c->proj_x_y[j] > c->proj_x_y[j+1]) {
-		return;
 		update_counter();
+		return;
 	}
 #endif
 
