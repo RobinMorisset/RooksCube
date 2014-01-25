@@ -151,14 +151,6 @@ void backtrack_next(struct Config *c, size_t i, size_t j) {
 		return;
 	}
 
-#if R_OPTIM4
-	/* Do we have a chance at beating the record ? */
-	int max_slots = N*N;
-	int max_available_slots = max_slots - (N-1-i)*N - (N-1-j);
-	if (c->k + max_available_slots <= c->best_k) {
-		return;
-	}
-#endif
 
 #if R_OPTIM2
 	/* Keep co-slices sorted */
@@ -169,8 +161,17 @@ void backtrack_next(struct Config *c, size_t i, size_t j) {
 
 #if R_OPTIM1
 	// TODO: optimise by switching to the next slice
-	if((i < N - 1 && c->cardinal_x[i] > c->cardinal_x[i+1])) {
-		return;
+	if(i < N - 1) {
+		if (c->cardinal_x[i] > c->cardinal_x[i+1]) {
+			return;
+		}
+#if R_OPTIM4
+		/* Do we have a chance at beating the record ? */
+		int max_available_slots = c->cardinal_x[i+1]*i + j + 1;
+		if (c->k + max_available_slots <= c->best_k) {
+			return;
+		}
+#endif
 	}
 #endif
 
