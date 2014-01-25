@@ -8,6 +8,24 @@
 #define N_BITFIELD uint32_t
 #define N_INDEX size_t
 
+#if R_COUNTER
+int counter = 0;
+
+void update_counter(void) {
+	counter++;
+}
+
+void print_counter(void) {
+	printf("Number of configurations explored: %i\n", counter);
+}
+#else
+void update_counter(void) {
+}
+
+void print_counter(void) {
+}
+#endif
+
 struct Config {
 	char max_z;
 	char k;
@@ -148,6 +166,7 @@ void backtrack_next(struct Config *c, N_INDEX i, N_INDEX j) {
 		if (c->k > c->best_k) {
 			update_best(c);
 		}
+		update_counter();
 		return;
 	}
 
@@ -156,6 +175,7 @@ void backtrack_next(struct Config *c, N_INDEX i, N_INDEX j) {
 	/* Keep co-slices sorted */
 	if (j < N - 1 && c->proj_x_y[j] > c->proj_x_y[j+1]) {
 		return;
+		update_counter();
 	}
 #endif
 
@@ -163,12 +183,14 @@ void backtrack_next(struct Config *c, N_INDEX i, N_INDEX j) {
 	// TODO: optimise by switching to the next slice
 	if(i < N - 1) {
 		if (c->cardinal_x[i] > c->cardinal_x[i+1]) {
+			update_counter();
 			return;
 		}
 #if R_OPTIM4
 		/* Do we have a chance at beating the record ? */
 		int max_available_slots = c->cardinal_x[i+1]*i + j + 1;
 		if (c->k + max_available_slots <= c->best_k) {
+			update_counter();
 			return;
 		}
 #endif
@@ -178,9 +200,9 @@ void backtrack_next(struct Config *c, N_INDEX i, N_INDEX j) {
 	/* Should we change slice ? */
 	if (j == 0) {
 		backtrack(c, i-1, N-1);
-		return;
+	} else {
+		backtrack(c, i, j-1);
 	}
-	backtrack(c, i, j-1);
 }
 
 void backtrack(struct Config *c, N_INDEX i, N_INDEX j) {
@@ -244,5 +266,6 @@ int main(int argc, char* argv[])
 
 	backtrack(&c, N-1, N-1);
 
+	print_counter();
 	return 0;
 }
