@@ -27,6 +27,7 @@ struct Config {
 	int k;
 	int best_k;
 	char best_heights[N][N];
+	char max_z;
 };
 
 void backtrack(struct Config *, size_t, size_t);
@@ -49,7 +50,9 @@ void backtrack_pillar(struct Config *c,
 	assert(j < N);
 	c->k++;
 #if R_OPTIM1
-	max_k = c->k < N ? c->k : N;
+	/* Optimisation: do not use height k before at least (k-1) rooks have
+	 * been added */
+	max_k = c->max_z;
 #else
 	max_k = N;
 #endif
@@ -80,9 +83,15 @@ void backtrack_pillar(struct Config *c,
 		c->forbidden_y_z[k] |= c->proj_y_x[i];
 		c->forbidden_x_y[j] |= c->proj_x_z[k];
 		c->forbidden_x_z[k] |= c->proj_x_y[j];
-
-		// Recursive call to backtrack
-		backtrack(c, i2, j2);
+#if R_OPTIM1
+		if (k+1 == c->max_z && c->max_z < N) {
+			c->max_z++;
+			// Recursive call to backtrack
+			backtrack(c, i2, j2);
+			c->max_z--;
+		} else
+#endif
+			backtrack(c, i2, j2);
 
 		// Restore old values
 		c->forbidden_z_x[i] = old_fzx;
@@ -207,6 +216,7 @@ int main(int argc, char* argv[])
 	}
 	c.k = 0;
 	c.best_k = 0;
+	c.max_z = 1;
 
 
 #if ROOKS_MONITOR
