@@ -50,8 +50,7 @@ void backtrack_pillar(struct Config *c,
 	assert(j < N);
 	c->k++;
 #if R_OPTIM1
-	/* Optimisation: do not use height k before at least (k-1) rooks have
-	 * been added */
+	/* Optimisation: only use heights in order */
 	max_k = c->max_z;
 #else
 	max_k = N;
