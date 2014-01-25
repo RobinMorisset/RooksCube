@@ -10,20 +10,44 @@
 
 #if R_COUNTER
 int counter = 0;
+int counter_1 = 0;
+int counter_2 = 0;
+int counter_4 = 0;
 
-void update_counter(void) {
+inline void update_counter(void) {
 	counter++;
 }
 
-void print_counter(void) {
-	printf("Number of configurations explored: %i\n", counter);
-}
-#else
-void update_counter(void) {
+inline void update_counter_1(void) {
+	counter++;
+	counter_1++;
 }
 
-void print_counter(void) {
+inline void update_counter_2(void) {
+	counter++;
+	counter_2++;
 }
+
+inline void update_counter_4(void) {
+	counter++;
+	counter_4++;
+}
+
+inline void print_counter(void) {
+	printf("Number of configurations explored: %i\n", counter);
+	printf("Number of configurations stopped by optimisation 1: %i\n",
+			counter_1);
+	printf("Number of configurations stopped by optimisation 2: %i\n",
+			counter_2);
+	printf("Number of configurations stopped by optimisation 4: %i\n",
+			counter_4);
+}
+#else
+inline void update_counter(void) {}
+inline void update_counter_1(void){}
+inline void update_counter_2(void){}
+inline void update_counter_4(void){}
+inline void print_counter(void) {}
 #endif
 
 struct Config {
@@ -134,13 +158,19 @@ void backtrack_pillar(struct Config *c,
 	backtrack_next(c, i, j);
 }
 
+void print_rook(uint8_t h) {
+	if (h == 0)
+		printf("* ");
+	else if (h < 10)
+		printf("%i ", h);
+	else
+		printf("%c ", 'A' + h - 10);
+}
+
 void print_config(struct Config * c) {
 	for (N_INDEX i = 0; i < N; i++) {
 		for (N_INDEX j = 0; j < N; j++) {
-			if (c->heights[i][j])
-				printf("%i ", c->heights[i][j]);
-			else
-				printf("* ");
+			print_rook(c->heights[i][j]);
 		}
 		printf("\n");
 	}
@@ -160,8 +190,35 @@ void update_best(struct Config *c) {
 #endif
 }
 
+// TODO: check validity of adding rooks before adding them
 void backtrack_next(struct Config *c, N_INDEX i, N_INDEX j) {
-	/* Are we at the end ?*/
+#if R_OPTIM1
+	// TODO: optimise by switching to the next slice
+	if(i < N - 1) {
+		if (c->cardinal_x[i] > c->cardinal_x[i+1]) {
+			update_counter_1();
+			return;
+		}
+#if R_OPTIM4
+		/* Do we have a chance at beating the record ? */
+		int max_available_slots = c->cardinal_x[i+1]*i + j;
+		if (c->k + max_available_slots <= c->best_k) {
+			update_counter_4();
+			return;
+		}
+#endif
+	}
+#endif
+
+#if R_OPTIM2
+	/* Keep co-slices sorted */
+	if (j < N - 1 && c->proj_x_y[j] > c->proj_x_y[j+1]) {
+		update_counter_2();
+		return;
+	}
+#endif
+
+	/* Are we at the end ? */
 	if (i == 0 && j == 0) {
 		if (c->k > c->best_k) {
 			update_best(c);
@@ -169,33 +226,6 @@ void backtrack_next(struct Config *c, N_INDEX i, N_INDEX j) {
 		update_counter();
 		return;
 	}
-
-
-#if R_OPTIM2
-	/* Keep co-slices sorted */
-	if (j < N - 1 && c->proj_x_y[j] > c->proj_x_y[j+1]) {
-		update_counter();
-		return;
-	}
-#endif
-
-#if R_OPTIM1
-	// TODO: optimise by switching to the next slice
-	if(i < N - 1) {
-		if (c->cardinal_x[i] > c->cardinal_x[i+1]) {
-			update_counter();
-			return;
-		}
-#if R_OPTIM4
-		/* Do we have a chance at beating the record ? */
-		int max_available_slots = c->cardinal_x[i+1]*i + j;
-		if (c->k + max_available_slots <= c->best_k) {
-			update_counter();
-			return;
-		}
-#endif
-	}
-#endif
 
 	/* Should we change slice ? */
 	if (j == 0) {
