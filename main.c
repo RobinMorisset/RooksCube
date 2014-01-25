@@ -5,12 +5,16 @@
 #include <unistd.h>
 #include <pthread.h>
 
-#define N_BITFIELD uint64_t
+#define N_BITFIELD uint32_t
 // TODO: also define a type for the indexes to check whether char/int is more
 // efficient than size_t
 
 struct Config {
+	size_t max_z;
+	int k;
+	int best_k;
 	char heights[N][N];
+	char best_heights[N][N];
 	// the index corresponds to x, the bitfield to a 'pillar' (z)
 	N_BITFIELD forbidden_z_x[N];
 	N_BITFIELD forbidden_z_y[N];
@@ -24,10 +28,6 @@ struct Config {
 	N_BITFIELD proj_y_x[N];
 	N_BITFIELD proj_x_y[N];
 	N_BITFIELD proj_x_z[N];
-	int k;
-	int best_k;
-	char best_heights[N][N];
-	char max_z;
 };
 
 void backtrack(struct Config *, size_t, size_t);
@@ -128,7 +128,10 @@ void print_config(struct Config * c) {
 
 void backtrack(struct Config *c, size_t i, size_t j) {
 	size_t i2, j2;
-	N_BITFIELD mask_x, mask_y, old_hpyx;
+	N_BITFIELD mask_x, mask_y;
+
+	mask_x = 1 << i;
+	mask_y = 1 << j;
 
 #if R_OPTIM2
 	/* Optimisation: keep the slices sorted */
@@ -170,10 +173,6 @@ void backtrack(struct Config *c, size_t i, size_t j) {
 		j2 = j+1;
 	}
 
-	mask_x = 1 << i;
-	mask_y = 1 << j;
-	assert(i < N);
-	assert(j < N);
 	if ((c->forbidden_y_x[i] & mask_y) || (c->forbidden_x_y[j] & mask_x))
 		backtrack(c, i2, j2);
 	else
@@ -192,7 +191,6 @@ int main(int argc, char* argv[])
 {
 	pthread_t t;
 	struct Config c;
-	struct Config b;
 
 	/* Initialisation */
 	for (size_t i = 0; i < N; i++) {
