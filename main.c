@@ -5,16 +5,13 @@
 #include <unistd.h>
 #include <pthread.h>
 
-#define N_BITFIELD uint32_t
-// TODO: also define a type for the indexes to check whether char/int is more
-// efficient than size_t
+#define N_BITFIELD uint64_t
+#define N_INDEX size_t
 
 struct Config {
-	size_t max_z;
-	int k;
-	int best_k;
-	char heights[N][N];
-	char best_heights[N][N];
+	char max_z;
+	char k;
+	char best_k;
 	// the index corresponds to x, the bitfield to a 'pillar' (z)
 	N_BITFIELD forbidden_z_x[N];
 	N_BITFIELD forbidden_z_y[N];
@@ -28,13 +25,17 @@ struct Config {
 	N_BITFIELD proj_y_x[N];
 	N_BITFIELD proj_x_y[N];
 	N_BITFIELD proj_x_z[N];
-};
+	char cardinal_x[N];
+	char heights[N][N];
+	char best_heights[N][N];
+	};
 
 void backtrack(struct Config *, size_t, size_t);
+void backtrack_next(struct Config *, size_t, size_t);
+void backtrack_pillar(struct Config *, size_t, size_t, N_BITFIELD, N_BITFIELD);
 
 void backtrack_pillar(struct Config *c,
-		size_t i, size_t j, N_BITFIELD mask_x, N_BITFIELD mask_y,
-		size_t i2, size_t j2) {
+		size_t i, size_t j, N_BITFIELD mask_x, N_BITFIELD mask_y) {
 	size_t max_k;
 	N_BITFIELD mask_z;
 	N_BITFIELD old_fzx, old_fzy, old_fyx, old_fyz, old_fxy, old_fxz;
@@ -49,7 +50,8 @@ void backtrack_pillar(struct Config *c,
 	assert(i < N);
 	assert(j < N);
 	c->k++;
-#if R_OPTIM1
+	c->cardinal_x[i]++;
+#if R_OPTIM3
 	/* Optimisation: only use heights in order */
 	max_k = c->max_z;
 #else
@@ -82,15 +84,15 @@ void backtrack_pillar(struct Config *c,
 		c->forbidden_y_z[k] |= c->proj_y_x[i];
 		c->forbidden_x_y[j] |= c->proj_x_z[k];
 		c->forbidden_x_z[k] |= c->proj_x_y[j];
-#if R_OPTIM1
+#if R_OPTIM3
 		if (k+1 == c->max_z && c->max_z < N) {
 			c->max_z++;
 			// Recursive call to backtrack
-			backtrack(c, i2, j2);
+			backtrack_next(c, i, j);
 			c->max_z--;
 		} else
 #endif
-			backtrack(c, i2, j2);
+			backtrack_next(c, i, j);
 
 		// Restore old values
 		c->forbidden_z_x[i] = old_fzx;
@@ -110,7 +112,8 @@ void backtrack_pillar(struct Config *c,
 	// Finally try leaving the pillar empty
 	c->heights[i][j] = 0;
 	c->k--;
-	backtrack(c, i2, j2);
+	c->cardinal_x[i]--;
+	backtrack_next(c, i, j);
 }
 
 void print_config(struct Config * c) {
@@ -126,58 +129,68 @@ void print_config(struct Config * c) {
 	printf("result: %i\n\n", c->k);
 }
 
-void backtrack(struct Config *c, size_t i, size_t j) {
-	size_t i2, j2;
-	N_BITFIELD mask_x, mask_y;
-
-	mask_x = 1 << i;
-	mask_y = 1 << j;
-
-#if R_OPTIM2
-	/* Optimisation: keep the slices sorted */
-	if (i >= 2 && c->proj_y_x[i-1] > c->proj_y_x[i-2]) {
-		return;
+void update_best(struct Config *c) {
+	for (size_t i = 0; i < N; i++) {
+		for (size_t j = 0; j < N; j++)
+			c->best_heights[i][j] =
+				c->heights[i][j];
 	}
-#endif
-
-	/* If we are beyond the end, stop */
-	if (i == N) {
-		if (c->k > c->best_k) {
-			for (size_t tmp_i = 0; tmp_i < N; tmp_i++) {
-				for (size_t tmp_j = 0; tmp_j < N; tmp_j++)
-					c->best_heights[tmp_i][tmp_j] = c->heights[tmp_i][tmp_j];
-			}
-			c->best_k = c->k;
+	c->best_k = c->k;
 #if ROOKS_PRINT
-			printf("----- BEST ! ----- %i\n", c->k);
-			print_config(c);
+	printf("----- BEST ! ----- %i\n", c->k);
+	print_config(c);
 #endif
+}
+
+void backtrack_next(struct Config *c, size_t i, size_t j) {
+	/* Are we at the end ?*/
+	if (i == 0 && j == 0) {
+		if (c->k > c->best_k) {
+			update_best(c);
 		}
 		return;
 	}
 
-#if R_OPTIM3
-	/* Optimisation: don't keep going if there is no chance of beating the record */
+#if R_OPTIM4
+	/* Do we have a chance at beating the record ? */
 	int max_slots = N*N;
-	int max_available_slots = max_slots - i*N - j;
-	if (c->k + max_available_slots <= c->best_k)
+	int max_available_slots = max_slots - (N-1-i)*N - (N-1-j);
+	if (c->k + max_available_slots <= c->best_k) {
 		return;
+	}
 #endif
 
-	/* Getting the coordinates for the recursive call */
-	if (j == N - 1) {
-		i2 = i+1;
-		j2 = 0;
-	} else {
-		i2 = i;
-		j2 = j+1;
+#if R_OPTIM2
+	/* Keep co-slices sorted */
+	if (j < N - 1 && c->proj_x_y[j] > c->proj_x_y[j+1]) {
+		return;
 	}
+#endif
 
-	if ((c->forbidden_y_x[i] & mask_y) || (c->forbidden_x_y[j] & mask_x))
-		backtrack(c, i2, j2);
+#if R_OPTIM1
+	if((i < N - 1 && c->cardinal_x[i] == c->cardinal_x[i+1])) {
+		return;
+	}
+#endif
+
+	/* Should we change slice ? */
+	if (j == 0) {
+		backtrack(c, i-1, N-1);
+		return;
+	}
+	backtrack(c, i, j-1);
+}
+
+void backtrack(struct Config *c, N_INDEX i, N_INDEX j) {
+	assert(i < N);
+	assert(j < N);
+	N_BITFIELD mask_x = 1 << i;
+	N_BITFIELD mask_y = 1 << j;
+	if ((c->forbidden_y_x[i] & mask_y)
+			|| (c->forbidden_x_y[j] & mask_x))
+		backtrack_next(c, i, j);
 	else
-		backtrack_pillar(c, i, j, mask_x, mask_y, i2, j2);
-
+		backtrack_pillar(c, i, j, mask_x, mask_y);
 }
 
 void * monitor(void *c) {
@@ -189,7 +202,9 @@ void * monitor(void *c) {
 
 int main(int argc, char* argv[])
 {
+#if ROOKS_MONITOR
 	pthread_t t;
+#endif
 	struct Config c;
 
 	/* Initialisation */
@@ -210,6 +225,7 @@ int main(int argc, char* argv[])
 		c.proj_y_x[i] = 0;
 		c.proj_x_y[i] = 0;
 		c.proj_x_z[i] = 0;
+		c.cardinal_x[i] = 0;
 	}
 	c.k = 0;
 	c.best_k = 0;
@@ -220,7 +236,7 @@ int main(int argc, char* argv[])
 	pthread_create(&t, NULL, monitor, &c);
 #endif
 
-	backtrack(&c, 0, 0);
+	backtrack(&c, N-1, N-1);
 
 	return 0;
 }
