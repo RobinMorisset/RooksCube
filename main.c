@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <pthread.h>
 
-#define N_BITFIELD uint64_t
+#define N_BITFIELD uint32_t
 #define N_INDEX size_t
 
 struct Config {
@@ -30,13 +30,13 @@ struct Config {
 	char best_heights[N][N];
 	};
 
-void backtrack(struct Config *, size_t, size_t);
-void backtrack_next(struct Config *, size_t, size_t);
-void backtrack_pillar(struct Config *, size_t, size_t, N_BITFIELD, N_BITFIELD);
+void backtrack(struct Config *, N_INDEX, N_INDEX);
+void backtrack_next(struct Config *, N_INDEX, N_INDEX);
+void backtrack_pillar(struct Config *, N_INDEX, N_INDEX, N_BITFIELD, N_BITFIELD);
 
 void backtrack_pillar(struct Config *c,
-		size_t i, size_t j, N_BITFIELD mask_x, N_BITFIELD mask_y) {
-	size_t max_k;
+		N_INDEX i, N_INDEX j, N_BITFIELD mask_x, N_BITFIELD mask_y) {
+	N_INDEX max_k;
 	N_BITFIELD mask_z;
 	N_BITFIELD old_fzx, old_fzy, old_fyx, old_fyz, old_fxy, old_fxz;
 
@@ -57,7 +57,7 @@ void backtrack_pillar(struct Config *c,
 #else
 	max_k = N;
 #endif
-	for (size_t k = 0; k < max_k; k++) {
+	for (N_INDEX k = 0; k < max_k; k++) {
 		// First check that this height is allowed.
 		// Could be further optimised with the __builtin_ffsll
 		mask_z = 1 << k;
@@ -117,8 +117,8 @@ void backtrack_pillar(struct Config *c,
 }
 
 void print_config(struct Config * c) {
-	for (size_t i = 0; i < N; i++) {
-		for (size_t j = 0; j < N; j++) {
+	for (N_INDEX i = 0; i < N; i++) {
+		for (N_INDEX j = 0; j < N; j++) {
 			if (c->heights[i][j])
 				printf("%i ", c->heights[i][j]);
 			else
@@ -130,8 +130,8 @@ void print_config(struct Config * c) {
 }
 
 void update_best(struct Config *c) {
-	for (size_t i = 0; i < N; i++) {
-		for (size_t j = 0; j < N; j++)
+	for (N_INDEX i = 0; i < N; i++) {
+		for (N_INDEX j = 0; j < N; j++)
 			c->best_heights[i][j] =
 				c->heights[i][j];
 	}
@@ -142,7 +142,7 @@ void update_best(struct Config *c) {
 #endif
 }
 
-void backtrack_next(struct Config *c, size_t i, size_t j) {
+void backtrack_next(struct Config *c, N_INDEX i, N_INDEX j) {
 	/* Are we at the end ?*/
 	if (i == 0 && j == 0) {
 		if (c->k > c->best_k) {
@@ -210,8 +210,8 @@ int main(int argc, char* argv[])
 	struct Config c;
 
 	/* Initialisation */
-	for (size_t i = 0; i < N; i++) {
-		for (size_t j = 0; j < N; j++) {
+	for (N_INDEX i = 0; i < N; i++) {
+		for (N_INDEX j = 0; j < N; j++) {
 			c.heights[i][j] = 0;
 			c.best_heights[i][j] = 0;
 		}
@@ -230,7 +230,11 @@ int main(int argc, char* argv[])
 		c.cardinal_x[i] = 0;
 	}
 	c.k = 0;
+#ifndef R_BEST
 	c.best_k = 0;
+#else
+	c.best_k = R_BEST;
+#endif
 	c.max_z = 1;
 
 
