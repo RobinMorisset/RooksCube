@@ -188,7 +188,7 @@ void backtrack_next(struct Config *c, N_INDEX i, N_INDEX j) {
 		}
 #if R_OPTIM4
 		/* Do we have a chance at beating the record ? */
-		int max_available_slots = c->cardinal_x[i+1]*i + j + 1;
+		int max_available_slots = c->cardinal_x[i+1]*i + j;
 		if (c->k + max_available_slots <= c->best_k) {
 			update_counter();
 			return;
