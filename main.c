@@ -124,7 +124,7 @@ void print_config(struct Config * c) {
 			else
 				printf("* ");
 		}
-		printf(" -> %i\n", c->proj_y_x[i]);
+		printf("\n");
 	}
 	printf("result: %i\n\n", c->k);
 }
