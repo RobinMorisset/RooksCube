@@ -13,6 +13,7 @@ int counter = 0;
 int counter_1 = 0;
 int counter_2 = 0;
 int counter_4 = 0;
+int counter_5 = 0;
 
 inline void update_counter(void) {
 	counter++;
@@ -33,6 +34,11 @@ inline void update_counter_4(void) {
 	counter_4++;
 }
 
+inline void update_counter_5(void) {
+	counter++;
+	counter_5++;
+}
+
 inline void print_counter(void) {
 	printf("Number of configurations explored: %i\n", counter);
 	printf("Number of configurations stopped by optimisation 1: %i\n",
@@ -41,12 +47,15 @@ inline void print_counter(void) {
 			counter_2);
 	printf("Number of configurations stopped by optimisation 4: %i\n",
 			counter_4);
+	printf("Number of configurations stopped by optimisation 5: %i\n",
+			counter_5);
 }
 #else
 inline void update_counter(void) {}
 inline void update_counter_1(void){}
 inline void update_counter_2(void){}
 inline void update_counter_4(void){}
+inline void update_counter_5(void){}
 inline void print_counter(void) {}
 #endif
 
@@ -204,6 +213,12 @@ void backtrack_next(struct Config *c, N_INDEX i, N_INDEX j) {
 		int max_available_slots = c->cardinal_x[i+1]*i + j;
 		if (c->k + max_available_slots <= c->best_k) {
 			update_counter_4();
+			return;
+		}
+#endif
+#if R_OPTIM5
+		if (j == 0 && c->cardinal_x[i] < (c->cardinal_x[N-1] - 1)) {
+			update_counter_5();
 			return;
 		}
 #endif
