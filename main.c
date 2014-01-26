@@ -124,7 +124,7 @@ void backtrack_pillar(struct Config *c,
 		old_fxz = c->forbidden_x_z[k];
 
 		// Add the rook
-		c->heights[i][j] = k+1; // because 0 is no rook
+		c->heights[i][j] = k_1; // because 0 is no rook
 		c->proj_z_x[i] |= mask_z;
 		c->proj_z_y[j] |= mask_z;
 		c->proj_y_z[k] |= mask_y;
@@ -138,7 +138,7 @@ void backtrack_pillar(struct Config *c,
 		c->forbidden_x_y[j] |= c->proj_x_z[k];
 		c->forbidden_x_z[k] |= c->proj_x_y[j];
 #if R_OPTIM3
-		if (k+1 == c->max_z && c->max_z < N) {
+		if (k_1 == c->max_z && c->max_z < N) {
 			c->max_z++;
 			// Recursive call to backtrack
 			backtrack_next(c, i, j);
@@ -185,7 +185,7 @@ void print_config(struct Config * c) {
 		}
 		printf("\n");
 	}
-	printf("result: %i\n\n", c->k);
+	printf("result: %i | %i\n\n", c->k, c->best_k);
 }
 
 void update_best(struct Config *c) {
