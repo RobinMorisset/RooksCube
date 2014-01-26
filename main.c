@@ -7,6 +7,7 @@
 
 #define N_BITFIELD uint32_t
 #define N_INDEX size_t
+#define FFS_BITFIELD(x) __builtin_ffs(x)
 
 #if R_COUNTER
 int counter = 0;
@@ -87,11 +88,9 @@ void backtrack_pillar(struct Config *, N_INDEX, N_INDEX, N_BITFIELD, N_BITFIELD)
 
 void backtrack_pillar(struct Config *c,
 		N_INDEX i, N_INDEX j, N_BITFIELD mask_x, N_BITFIELD mask_y) {
-	N_INDEX max_k;
-	N_BITFIELD mask_z;
+	N_INDEX k, k_1 = 0, offset_k, max_k;
+	N_BITFIELD mask_z, allowed_z, forbidden_z;
 	N_BITFIELD old_fzx, old_fzy, old_fyx, old_fyz, old_fxy, old_fxz;
-
-	N_BITFIELD forbidden_z = c->forbidden_z_x[i] | c->forbidden_z_y[j];
 
 	// Save to restore later
 	old_fzx = c->forbidden_z_x[i]; // TODO: save only once per slice
@@ -102,20 +101,23 @@ void backtrack_pillar(struct Config *c,
 	assert(j < N);
 	c->k++;
 	c->cardinal_x[i]++;
+
 #if R_OPTIM3
 	/* Optimisation: only use heights in order */
 	max_k = c->max_z;
 #else
 	max_k = N;
 #endif
-	for (N_INDEX k = 0; k < max_k; k++) {
-		// First check that this height is allowed.
-		// Could be further optimised with the __builtin_ffsll
-		mask_z = 1 << k;
-		if((mask_z & forbidden_z)
-				|| (mask_x & c->forbidden_x_z[k])
+	forbidden_z = c->forbidden_z_x[i] | c->forbidden_z_y[j];
+	allowed_z = (~forbidden_z) & ((1 << max_k) - 1);
+	while ((offset_k = FFS_BITFIELD(allowed_z))) {
+		k_1 += offset_k;
+		allowed_z = allowed_z >> offset_k;
+		k = k_1 - 1;
+		if ((mask_x & c->forbidden_x_z[k])
 				|| (mask_y & c->forbidden_y_z[k]))
 			continue;
+		mask_z = 1 << k;
 
 		// Save to restore later
 		old_fyz = c->forbidden_y_z[k];
