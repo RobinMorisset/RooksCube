@@ -15,6 +15,7 @@ int counter_1 = 0;
 int counter_2 = 0;
 int counter_4 = 0;
 int counter_5 = 0;
+int counter_6 = 0;
 
 inline void update_counter(void) {
 	counter++;
@@ -40,6 +41,11 @@ inline void update_counter_5(void) {
 	counter_5++;
 }
 
+inline void update_counter_5(void) {
+	counter++;
+	counter_6++;
+}
+
 inline void print_counter(void) {
 	printf("Number of configurations explored: %i\n", counter);
 	printf("Number of configurations stopped by optimisation 1: %i\n",
@@ -57,6 +63,7 @@ inline void update_counter_1(void){}
 inline void update_counter_2(void){}
 inline void update_counter_4(void){}
 inline void update_counter_5(void){}
+inline void update_counter_6(void){}
 inline void print_counter(void) {}
 #endif
 
@@ -138,7 +145,7 @@ void backtrack_pillar(struct Config *c,
 		c->forbidden_x_y[j] |= c->proj_x_z[k];
 		c->forbidden_x_z[k] |= c->proj_x_y[j];
 #if R_OPTIM3
-		if (k_1 == c->max_z && c->max_z < N) {
+		if (c->max_z < N && k_1 == c->max_z) {
 			c->max_z++;
 			// Recursive call to backtrack
 			backtrack_next(c, i, j);
@@ -210,6 +217,13 @@ void backtrack_next(struct Config *c, N_INDEX i, N_INDEX j) {
 			update_counter_1();
 			return;
 		}
+#if R_OPTIM6
+		if (c->cardinal_x[i] == c->cardinal_x[i+1]
+				&& c->proj_y_x[i] > c->proj_y_x[i+1]) {
+			update_counter_6();
+			return;
+		}
+#endif
 #if R_OPTIM4
 		/* Do we have a chance at beating the record ? */
 		int max_available_slots = c->cardinal_x[i+1]*i + j;
