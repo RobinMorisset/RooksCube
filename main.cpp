@@ -10,52 +10,19 @@
 #define FFS_BITFIELD(x) __builtin_ffs(x)
 
 #if R_COUNTER
-int counter = 0;
-int counter_1 = 0;
-int counter_2 = 0;
-int counter_4 = 0;
-int counter_5 = 0;
-int counter_6 = 0;
-
-inline void update_counter(void) {
-	counter++;
-}
-
-inline void update_counter_1(void) {
-	counter++;
-	counter_1++;
-}
-
-inline void update_counter_2(void) {
-	counter++;
-	counter_2++;
-}
-
-inline void update_counter_4(void) {
-	counter++;
-	counter_4++;
-}
-
-inline void update_counter_5(void) {
-	counter++;
-	counter_5++;
-}
-
-inline void update_counter_5(void) {
-	counter++;
-	counter_6++;
-}
-
+int counter[7];
+inline void update_counter(void) {counter[0]++;}
+inline void update_counter_1(void) {counter[1]++;}
+inline void update_counter_2(void) {counter[2]++;}
+inline void update_counter_3(void) {counter[3]++;}
+inline void update_counter_4(void) {counter[4]++;}
+inline void update_counter_5(void) {counter[5]++;}
+inline void update_counter_6(void) {counter[6]++;}
 inline void print_counter(void) {
-	printf("Number of configurations explored: %i\n", counter);
-	printf("Number of configurations stopped by optimisation 1: %i\n",
-			counter_1);
-	printf("Number of configurations stopped by optimisation 2: %i\n",
-			counter_2);
-	printf("Number of configurations stopped by optimisation 4: %i\n",
-			counter_4);
-	printf("Number of configurations stopped by optimisation 5: %i\n",
-			counter_5);
+	for (int i = 0; i < 7; i++) {
+		printf("Number of configurations stopped by optimisation %i: %i\n"
+				, i, counter[i]);
+	}
 }
 #else
 inline void update_counter(void) {}
@@ -135,7 +102,8 @@ void backtrack_pillar(struct Config *c,
 		c->proj_z_x[i] |= mask_z;
 		c->proj_z_y[j] |= mask_z;
 		c->proj_y_z[k] |= mask_y;
-		c->proj_y_x[i] |= mask_y;
+		c->proj_y_x[i] |= mask_y; // Could be done only once per loop
+					  // but is weirdly slower
 		c->proj_x_z[k] |= mask_x;
 		c->proj_x_y[j] |= mask_x;
 		c->forbidden_z_x[i] |= c->proj_z_y[j];
@@ -211,7 +179,6 @@ void update_best(struct Config *c) {
 // TODO: check validity of adding rooks before adding them
 void backtrack_next(struct Config *c, N_INDEX i, N_INDEX j) {
 #if R_OPTIM1
-	// TODO: optimise by switching to the next slice
 	if(i < N - 1) {
 		if (c->cardinal_x[i] > c->cardinal_x[i+1]) {
 			update_counter_1();
