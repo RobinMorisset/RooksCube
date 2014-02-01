@@ -34,10 +34,10 @@ inline void update_counter_6(void){}
 inline void print_counter(void) {}
 #endif
 
-struct Config {
+struct Config final {
 	char max_z;
-	char k;
-	char best_k;
+	char card;
+	char best_card;
 	// the index corresponds to x, the bitfield to a 'pillar' (z)
 	N_BITFIELD forbidden_z_x[N];
 	N_BITFIELD forbidden_z_y[N];
@@ -54,94 +54,96 @@ struct Config {
 	char cardinal_x[N];
 	char heights[N][N];
 	char best_heights[N][N];
-	};
+	void backtrack(N_INDEX, N_INDEX);
+	void backtrack_next(N_INDEX, N_INDEX);
+	void backtrack_pillar(N_INDEX, N_INDEX, N_BITFIELD, N_BITFIELD);
+	void print_config();
+	void update_best();
+};
 
-void backtrack(struct Config *, N_INDEX, N_INDEX);
-void backtrack_next(struct Config *, N_INDEX, N_INDEX);
-void backtrack_pillar(struct Config *, N_INDEX, N_INDEX, N_BITFIELD, N_BITFIELD);
 
-void backtrack_pillar(struct Config *c,
+void Config::backtrack_pillar(
 		N_INDEX i, N_INDEX j, N_BITFIELD mask_x, N_BITFIELD mask_y) {
 	N_INDEX k, k_1 = 0, offset_k, max_k;
 	N_BITFIELD mask_z, allowed_z, forbidden_z;
 	N_BITFIELD old_fzx, old_fzy, old_fyx, old_fyz, old_fxy, old_fxz;
 
 	// Save to restore later
-	old_fzx = c->forbidden_z_x[i]; // TODO: save only once per slice
-	old_fyx = c->forbidden_y_x[i];
-	old_fzy = c->forbidden_z_y[j];
-	old_fxy = c->forbidden_x_y[j];
+	old_fzx = forbidden_z_x[i]; // TODO: save only once per slice
+	old_fyx = forbidden_y_x[i];
+	old_fzy = forbidden_z_y[j];
+	old_fxy = forbidden_x_y[j];
 	assert(i < N);
 	assert(j < N);
-	c->k++;
-	c->cardinal_x[i]++;
+	card++;
+	cardinal_x[i]++;
 
 #if R_OPTIM3
 	/* Optimisation: only use heights in order */
-	max_k = c->max_z;
+	max_k = max_z;
 #else
 	max_k = N;
 #endif
-	forbidden_z = c->forbidden_z_x[i] | c->forbidden_z_y[j];
-	allowed_z = (~forbidden_z) & ((1 << max_k) - 1);
+	forbidden_z = forbidden_z_x[i] | forbidden_z_y[j];
+	allowed_z = (~forbidden_z) & ((1 << max_k) - 1); // TODO: optimize
 	while ((offset_k = FFS_BITFIELD(allowed_z))) {
 		k_1 += offset_k;
 		allowed_z = allowed_z >> offset_k;
 		k = k_1 - 1;
-		if ((mask_x & c->forbidden_x_z[k])
-				|| (mask_y & c->forbidden_y_z[k]))
+		if ((mask_x & forbidden_x_z[k])
+				|| (mask_y & forbidden_y_z[k]))
 			continue;
 		mask_z = 1 << k;
 
 		// Save to restore later
-		old_fyz = c->forbidden_y_z[k];
-		old_fxz = c->forbidden_x_z[k];
+		old_fyz = forbidden_y_z[k];
+		old_fxz = forbidden_x_z[k];
 
 		// Add the rook
-		c->heights[i][j] = k_1; // because 0 is no rook
-		c->proj_z_x[i] |= mask_z;
-		c->proj_z_y[j] |= mask_z;
-		c->proj_y_z[k] |= mask_y;
-		c->proj_y_x[i] |= mask_y; // Could be done only once per loop
-					  // but is weirdly slower
-		c->proj_x_z[k] |= mask_x;
-		c->proj_x_y[j] |= mask_x;
-		c->forbidden_z_x[i] |= c->proj_z_y[j];
-		c->forbidden_z_y[j] |= c->proj_z_x[i];
-		c->forbidden_y_x[i] |= c->proj_y_z[k];
-		c->forbidden_y_z[k] |= c->proj_y_x[i];
-		c->forbidden_x_y[j] |= c->proj_x_z[k];
-		c->forbidden_x_z[k] |= c->proj_x_y[j];
+		heights[i][j] = k_1; // because 0 is no rook
+		proj_z_x[i] |= mask_z;
+		proj_z_y[j] |= mask_z;
+		proj_y_z[k] |= mask_y;
+		proj_y_x[i] |= mask_y; // Could be done only once per loop
+		     		  // but is weirdly slower
+		proj_x_z[k] |= mask_x;
+		proj_x_y[j] |= mask_x;
+		forbidden_z_x[i] |= proj_z_y[j];
+		forbidden_z_y[j] |= proj_z_x[i];
+		forbidden_y_x[i] |= proj_y_z[k];
+		forbidden_y_z[k] |= proj_y_x[i];
+		forbidden_x_y[j] |= proj_x_z[k];
+		forbidden_x_z[k] |= proj_x_y[j];
 #if R_OPTIM3
-		if (c->max_z < N && k_1 == c->max_z) {
-			c->max_z++;
+		if (max_z < N && k_1 == max_z) {
+			max_z++;
 			// Recursive call to backtrack
-			backtrack_next(c, i, j);
-			c->max_z--;
+			backtrack_next(i, j);
+			max_z--;
 		} else
 #endif
-			backtrack_next(c, i, j);
+			backtrack_next(i, j);
 
 		// Restore old values
-		c->forbidden_z_x[i] = old_fzx;
-		c->forbidden_z_y[j] = old_fzy;
-		c->forbidden_y_x[i] = old_fyx;
-		c->forbidden_y_z[k] = old_fyz;
-		c->forbidden_x_y[j] = old_fxy;
-		c->forbidden_x_z[k] = old_fxz;
-		c->proj_z_x[i] ^= mask_z;
-		c->proj_z_y[j] ^= mask_z;
-		c->proj_y_z[k] ^= mask_y;
-		c->proj_y_x[i] ^= mask_y;
-		c->proj_x_z[k] ^= mask_x;
-		c->proj_x_y[j] ^= mask_x;
+		forbidden_z_x[i] = old_fzx;
+		forbidden_z_y[j] = old_fzy;
+		forbidden_y_x[i] = old_fyx;
+		forbidden_y_z[k] = old_fyz;
+		forbidden_x_y[j] = old_fxy;
+		forbidden_x_z[k] = old_fxz;
+		proj_z_x[i] ^= mask_z;
+		proj_z_y[j] ^= mask_z;
+		proj_y_z[k] ^= mask_y;
+		proj_y_x[i] ^= mask_y;
+		proj_x_z[k] ^= mask_x;
+		proj_x_y[j] ^= mask_x;
 	}
 
 	// Finally try leaving the pillar empty
-	c->heights[i][j] = 0;
-	c->k--;
-	c->cardinal_x[i]--;
-	backtrack_next(c, i, j);
+	heights[i][j] = 0;
+	card--;
+	cardinal_x[i]--;
+	backtrack_next(i, j);
 }
 
 void print_rook(uint8_t h) {
@@ -153,54 +155,54 @@ void print_rook(uint8_t h) {
 		printf("%c ", 'A' + h - 10);
 }
 
-void print_config(struct Config * c) {
+void Config::print_config() {
 	for (N_INDEX i = 0; i < N; i++) {
 		for (N_INDEX j = 0; j < N; j++) {
-			print_rook(c->heights[i][j]);
+			print_rook(heights[i][j]);
 		}
 		printf("\n");
 	}
-	printf("result: %i | %i\n\n", c->k, c->best_k);
+	printf("result: %i | %i\n\n", card, best_card);
 }
 
-void update_best(struct Config *c) {
+void Config::update_best() {
 	for (N_INDEX i = 0; i < N; i++) {
 		for (N_INDEX j = 0; j < N; j++)
-			c->best_heights[i][j] =
-				c->heights[i][j];
+			best_heights[i][j] =
+				heights[i][j];
 	}
-	c->best_k = c->k;
+	best_card = card;
 #if ROOKS_PRINT
-	printf("----- BEST ! ----- %i\n", c->k);
-	print_config(c);
+	printf("----- BEST ! ----- %i\n", card);
+	print_config();
 #endif
 }
 
 // TODO: check validity of adding rooks before adding them
-void backtrack_next(struct Config *c, N_INDEX i, N_INDEX j) {
+void Config::backtrack_next(N_INDEX i, N_INDEX j) {
 #if R_OPTIM1
 	if(i < N - 1) {
-		if (c->cardinal_x[i] > c->cardinal_x[i+1]) {
+		if (cardinal_x[i] > cardinal_x[i+1]) {
 			update_counter_1();
 			return;
 		}
 #if R_OPTIM6
-		if (c->cardinal_x[i] == c->cardinal_x[i+1]
-				&& c->proj_y_x[i] > c->proj_y_x[i+1]) {
+		if (cardinal_x[i] == cardinal_x[i+1]
+				&& proj_y_x[i] > proj_y_x[i+1]) {
 			update_counter_6();
 			return;
 		}
 #endif
 #if R_OPTIM4
 		/* Do we have a chance at beating the record ? */
-		int max_available_slots = c->cardinal_x[i+1]*i + j;
-		if (c->k + max_available_slots <= c->best_k) {
+		int max_available_slots = cardinal_x[i+1]*i + j;
+		if (card + max_available_slots <= best_card) {
 			update_counter_4();
 			return;
 		}
 #endif
 #if R_OPTIM5
-		if (j == 0 && c->cardinal_x[i] < (c->cardinal_x[N-1] - 1)) {
+		if (j == 0 && cardinal_x[i] < (cardinal_x[N-1] - 1)) {
 			update_counter_5();
 			return;
 		}
@@ -210,7 +212,7 @@ void backtrack_next(struct Config *c, N_INDEX i, N_INDEX j) {
 
 #if R_OPTIM2
 	/* Keep co-slices sorted */
-	if (j < N - 1 && c->proj_x_y[j] > c->proj_x_y[j+1]) {
+	if (j < N - 1 && proj_x_y[j] > proj_x_y[j+1]) {
 		update_counter_2();
 		return;
 	}
@@ -218,8 +220,8 @@ void backtrack_next(struct Config *c, N_INDEX i, N_INDEX j) {
 
 	/* Are we at the end ? */
 	if (i == 0 && j == 0) {
-		if (c->k > c->best_k) {
-			update_best(c);
+		if (card > best_card) {
+			update_best();
 		}
 		update_counter();
 		return;
@@ -227,28 +229,28 @@ void backtrack_next(struct Config *c, N_INDEX i, N_INDEX j) {
 
 	/* Should we change slice ? */
 	if (j == 0) {
-		backtrack(c, i-1, N-1);
+		backtrack(i-1, N-1);
 	} else {
-		backtrack(c, i, j-1);
+		backtrack(i, j-1);
 	}
 }
 
-void backtrack(struct Config *c, N_INDEX i, N_INDEX j) {
+void Config::backtrack(N_INDEX i, N_INDEX j) {
 	assert(i < N);
 	assert(j < N);
 	N_BITFIELD mask_x = 1 << i;
 	N_BITFIELD mask_y = 1 << j;
-	if ((c->forbidden_y_x[i] & mask_y)
-			|| (c->forbidden_x_y[j] & mask_x))
-		backtrack_next(c, i, j);
+	if ((forbidden_y_x[i] & mask_y)
+			|| (forbidden_x_y[j] & mask_x))
+		backtrack_next(i, j);
 	else
-		backtrack_pillar(c, i, j, mask_x, mask_y);
+		backtrack_pillar(i, j, mask_x, mask_y);
 }
 
 void * monitor(void *c) {
 	for(;;) {
 		sleep(1);
-		print_config((struct Config *) c);
+		((struct Config *) c)->print_config();
 	}
 }
 
@@ -279,11 +281,11 @@ int main(int argc, char* argv[])
 		c.proj_x_z[i] = 0;
 		c.cardinal_x[i] = 0;
 	}
-	c.k = 0;
+	c.card = 0;
 #ifndef R_BEST
-	c.best_k = 0;
+	c.best_card = 0;
 #else
-	c.best_k = R_BEST;
+	c.best_card = R_BEST;
 #endif
 	c.max_z = 1;
 
@@ -292,7 +294,7 @@ int main(int argc, char* argv[])
 	pthread_create(&t, NULL, monitor, &c);
 #endif
 
-	backtrack(&c, N-1, N-1);
+	c.backtrack(N-1, N-1);
 
 	print_counter();
 	return 0;
