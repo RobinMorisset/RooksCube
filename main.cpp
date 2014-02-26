@@ -48,12 +48,12 @@ struct Config final {
 	N_BITFIELD proj_z_x[N];
 	N_BITFIELD proj_z_y[N];
 	N_BITFIELD proj_y_z[N];
-	N_BITFIELD proj_y_x[N];
+	N_BITFIELD proj_y_x[N+1];
 	N_BITFIELD proj_x_y[N];
 	N_BITFIELD proj_x_z[N];
-	char cardinal_x[N];
 	char heights[N][N];
 	char best_heights[N][N];
+	char cardinal_x[N+1];
 	void backtrack(N_INDEX, N_INDEX);
 	void backtrack_next(N_INDEX, N_INDEX);
 	void backtrack_pillar(N_INDEX, N_INDEX, N_BITFIELD, N_BITFIELD);
@@ -179,36 +179,29 @@ void Config::update_best() {
 
 // TODO: check validity of adding rooks before adding them
 void Config::backtrack_next(N_INDEX i, N_INDEX j) {
-#if R_OPTIM1
-	if(i < N - 1) {
-		if (cardinal_x[i] > cardinal_x[i+1]) {
-			update_counter_1();
-			return;
-		}
-#if R_OPTIM6
-		if (cardinal_x[i] == cardinal_x[i+1]
-				&& proj_y_x[i] > proj_y_x[i+1]) {
-			update_counter_6();
-			return;
-		}
-#endif
 #if R_OPTIM4
-		/* Do we have a chance at beating the record ? */
-		int max_available_slots = cardinal_x[i+1]*i + j;
-		if (card + max_available_slots <= best_card) {
-			update_counter_4();
-			return;
-		}
+	/* Do we have a chance at beating the record ? */
+	int max_available_slots = cardinal_x[i+1]*i + j;
+	if (card + max_available_slots <= best_card) {
+		update_counter_4();
+		return;
+	}
 #endif
-#if R_OPTIM5
-		if (j == 0 && cardinal_x[i] < (cardinal_x[N-1] - 1)) {
-			update_counter_5();
-			return;
-		}
-#endif
+#if R_OPTIM1
+	if (cardinal_x[i] > cardinal_x[i+1]) {
+		update_counter_1();
+		return;
 	}
 #endif
 
+
+#if R_OPTIM6
+	if (cardinal_x[i] == cardinal_x[i+1]
+			&& proj_y_x[i] > proj_y_x[i+1]) {
+		update_counter_6();
+		return;
+	}
+#endif
 #if R_OPTIM2
 	/* Keep co-slices sorted */
 	if (j < N - 1 && proj_x_y[j] > proj_x_y[j+1]) {
@@ -219,6 +212,12 @@ void Config::backtrack_next(N_INDEX i, N_INDEX j) {
 
 	/* Should we change slice ? */
 	if (j == 0) {
+#if R_OPTIM5
+		if (cardinal_x[i]+1 < cardinal_x[N-1]) {
+			update_counter_5();
+			return;
+		}
+#endif
 		/* Are we at the end ? */
 		if (i == 0) {
 			if (card > best_card) {
@@ -279,6 +278,8 @@ int main(int argc, char* argv[])
 		c.proj_x_z[i] = 0;
 		c.cardinal_x[i] = 0;
 	}
+	c.cardinal_x[N] = N;
+	c.proj_y_x[N] = (N_BITFIELD) (-1);
 	c.card = 0;
 #ifndef R_BEST
 	c.best_card = 0;
