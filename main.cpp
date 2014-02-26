@@ -218,17 +218,16 @@ void Config::backtrack_next(N_INDEX i, N_INDEX j) {
 	}
 #endif
 
-	/* Are we at the end ? */
-	if (i == 0 && j == 0) {
-		if (card > best_card) {
-			update_best();
-		}
-		update_counter();
-		return;
-	}
-
 	/* Should we change slice ? */
 	if (j == 0) {
+		/* Are we at the end ? */
+		if (i == 0) {
+			if (card > best_card) {
+				update_best();
+			}
+			update_counter();
+			return;
+		}
 		backtrack(i-1, N-1);
 	} else {
 		backtrack(i, j-1);
