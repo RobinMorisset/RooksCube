@@ -77,6 +77,8 @@ void Config::backtrack_pillar(
 	assert(j < N);
 	card++;
 	cardinal_x[i]++;
+	proj_y_x[i] |= mask_y;
+	proj_x_y[j] |= mask_x;
 
 #if R_OPTIM3
 	/* Optimisation: only use heights in order */
@@ -104,10 +106,7 @@ void Config::backtrack_pillar(
 		proj_z_x[i] |= mask_z;
 		proj_z_y[j] |= mask_z;
 		proj_y_z[k] |= mask_y;
-		proj_y_x[i] |= mask_y; // Could be done only once per loop
-		     		  // but is weirdly slower
 		proj_x_z[k] |= mask_x;
-		proj_x_y[j] |= mask_x;
 		forbidden_z_x[i] |= proj_z_y[j];
 		forbidden_z_y[j] |= proj_z_x[i];
 		forbidden_y_x[i] |= proj_y_z[k];
@@ -134,13 +133,13 @@ void Config::backtrack_pillar(
 		proj_z_x[i] ^= mask_z;
 		proj_z_y[j] ^= mask_z;
 		proj_y_z[k] ^= mask_y;
-		proj_y_x[i] ^= mask_y;
 		proj_x_z[k] ^= mask_x;
-		proj_x_y[j] ^= mask_x;
 	}
 
 	// Finally try leaving the pillar empty
 	heights[i][j] = 0;
+	proj_y_x[i] ^= mask_y;
+	proj_x_y[j] ^= mask_x;
 	card--;
 	cardinal_x[i]--;
 	backtrack_next(i, j);
