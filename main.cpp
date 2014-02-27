@@ -12,13 +12,7 @@
 
 #if R_COUNTER
 int counter[7];
-inline void update_counter(void) {counter[0]++;}
-inline void update_counter_1(void) {counter[1]++;}
-inline void update_counter_2(void) {counter[2]++;}
-inline void update_counter_3(void) {counter[3]++;}
-inline void update_counter_4(void) {counter[4]++;}
-inline void update_counter_5(void) {counter[5]++;}
-inline void update_counter_6(void) {counter[6]++;}
+inline void update_counter(size_t i) {counter[i]++;}
 inline void print_counter(void) {
 	for (int i = 0; i < 7; i++) {
 		printf("Number of configurations stopped by optimisation %i: %i\n"
@@ -26,12 +20,7 @@ inline void print_counter(void) {
 	}
 }
 #else
-inline void update_counter(void) {}
-inline void update_counter_1(void){}
-inline void update_counter_2(void){}
-inline void update_counter_4(void){}
-inline void update_counter_5(void){}
-inline void update_counter_6(void){}
+inline void update_counter(size_t i) {}
 inline void print_counter(void) {}
 #endif
 
@@ -208,21 +197,21 @@ void Worker_next<false, false>::backtrack_next(Config * c,
 		N_INDEX i, N_INDEX j) {
 #if R_OPTIM1
 	if (c->cardinal_x[i] > c->cardinal_x[i+1]) {
-		update_counter_1();
+		update_counter(1);
 		return;
 	}
 #endif
 #if R_OPTIM6
 	if (c->cardinal_x[i] == c->cardinal_x[i+1]
 			&& c->proj_y_x[i] > c->proj_y_x[i+1]) {
-		update_counter_6();
+		update_counter(6);
 		return;
 	}
 #endif
 #if R_OPTIM2
 	/* Keep co-slices sorted */
 	if (c->proj_x_y[j] > c->proj_x_y[j+1]) {
-		update_counter_2();
+		update_counter(2);
 		return;
 	}
 #endif
@@ -231,7 +220,7 @@ void Worker_next<false, false>::backtrack_next(Config * c,
 	if (j == 0) {
 #if R_OPTIM5
 		if (c->cardinal_x[i]+1 < c->cardinal_x[N-1]) {
-			update_counter_5();
+			update_counter(5);
 			return;
 		}
 #endif
@@ -240,7 +229,7 @@ void Worker_next<false, false>::backtrack_next(Config * c,
 			if (c->card > c->best_card) {
 				c->update_best();
 			}
-			update_counter();
+			update_counter(0);
 			return;
 		}
 		Worker<false>::backtrack(c, i-1, N-1);
@@ -256,7 +245,7 @@ void Worker_next<false, true>::backtrack_next(Config * c,
 	/* Do we have a chance at beating the record ? */
 	int max_available_slots = c->cardinal_x[i+1]*i + j;
 	if (c->card + max_available_slots <= c->best_card) {
-		update_counter_4();
+		update_counter(4);
 		return;
 	}
 #endif
@@ -264,7 +253,7 @@ void Worker_next<false, true>::backtrack_next(Config * c,
 	if (j == 0) {
 #if R_OPTIM5
 		if (c->cardinal_x[i]+1 < c->cardinal_x[N-1]) {
-			update_counter_5();
+			update_counter(5);
 			return;
 		}
 #endif
@@ -273,7 +262,7 @@ void Worker_next<false, true>::backtrack_next(Config * c,
 			if (c->card > c->best_card) {
 				c->update_best();
 			}
-			update_counter();
+			update_counter(0);
 			return;
 		}
 		Worker<false>::backtrack(c, i-1, N-1);
@@ -287,7 +276,7 @@ void Worker_next<true, true>::backtrack_next(Config * c,
 #if R_OPTIM4
 	/* Do we have a chance at beating the record ? */
 	if (N*(c->card + j) <= c->best_card) {
-		update_counter_4();
+		update_counter(4);
 		return;
 	}
 #endif
@@ -305,7 +294,7 @@ void Worker_next<true, false>::backtrack_next(Config * c,
 #if R_OPTIM2
 	/* Keep co-slices sorted */
 	if (c->proj_x_y[j] > c->proj_x_y[j+1]) {
-		update_counter_2();
+		update_counter(2);
 		return;
 	}
 #endif
