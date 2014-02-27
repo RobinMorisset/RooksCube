@@ -167,10 +167,8 @@ void Worker<on_initial_line, on_initial_column>::backtrack_pillar(Config * c,
 	c->cardinal_x[i]++;
 	if(OPTIM1_CHECK(c, i, j)) {
 		c->cardinal_x[i]--;
-		c->proj_x_y[j] ^= mask_x;
-		Worker_next<on_initial_line, on_initial_column, true
-			>::backtrack_next(c, i, 0);
-		return;
+		j = 0; // skips ahead to the end of the line
+		goto skip_slot;
 	}
 
 	c->proj_y_x[i] |= mask_y;
