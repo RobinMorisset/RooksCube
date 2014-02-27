@@ -206,21 +206,6 @@ void Config::update_best() {
 
 void Worker_next<false, false>::backtrack_next(Config * c,
 		N_INDEX i, N_INDEX j) {
-	Worker_next<false, true>::backtrack_next(c, i, j);
-	return;
-}
-
-// TODO: check validity of adding rooks before adding them
-void Worker_next<false, true>::backtrack_next(Config * c,
-		N_INDEX i, N_INDEX j) {
-#if R_OPTIM4
-	/* Do we have a chance at beating the record ? */
-	int max_available_slots = c->cardinal_x[i+1]*i + j;
-	if (c->card + max_available_slots <= c->best_card) {
-		update_counter_4();
-		return;
-	}
-#endif
 #if R_OPTIM1
 	if (c->cardinal_x[i] > c->cardinal_x[i+1]) {
 		update_counter_1();
@@ -242,6 +227,39 @@ void Worker_next<false, true>::backtrack_next(Config * c,
 	}
 #endif
 
+/* Should we change slice ? */
+	if (j == 0) {
+#if R_OPTIM5
+		if (c->cardinal_x[i]+1 < c->cardinal_x[N-1]) {
+			update_counter_5();
+			return;
+		}
+#endif
+		/* Are we at the end ? */
+		if (i == 0) {
+			if (c->card > c->best_card) {
+				c->update_best();
+			}
+			update_counter();
+			return;
+		}
+		Worker<false>::backtrack(c, i-1, N-1);
+	} else {
+		Worker<false>::backtrack(c, i, j-1);
+	}
+}
+
+// TODO: check validity of adding rooks before adding them
+void Worker_next<false, true>::backtrack_next(Config * c,
+		N_INDEX i, N_INDEX j) {
+#if R_OPTIM4
+	/* Do we have a chance at beating the record ? */
+	int max_available_slots = c->cardinal_x[i+1]*i + j;
+	if (c->card + max_available_slots <= c->best_card) {
+		update_counter_4();
+		return;
+	}
+#endif
 	/* Should we change slice ? */
 	if (j == 0) {
 #if R_OPTIM5
@@ -266,12 +284,6 @@ void Worker_next<false, true>::backtrack_next(Config * c,
 
 void Worker_next<true, true>::backtrack_next(Config * c,
 		N_INDEX i, N_INDEX j) {
-	Worker_next<true, false>::backtrack_next(c, i, j);
-	return;
-}
-
-void Worker_next<true, false>::backtrack_next(Config * c,
-		N_INDEX i, N_INDEX j) {
 #if R_OPTIM4
 	/* Do we have a chance at beating the record ? */
 	if (N*(c->card + j) <= c->best_card) {
@@ -279,6 +291,17 @@ void Worker_next<true, false>::backtrack_next(Config * c,
 		return;
 	}
 #endif
+
+/* Should we change slice ? */
+	if (j == 0) {
+		Worker<false>::backtrack(c, i-1, N-1);
+	} else {
+		Worker<true>::backtrack(c, i, j-1);
+	}
+}
+
+void Worker_next<true, false>::backtrack_next(Config * c,
+		N_INDEX i, N_INDEX j) {
 #if R_OPTIM2
 	/* Keep co-slices sorted */
 	if (c->proj_x_y[j] > c->proj_x_y[j+1]) {
