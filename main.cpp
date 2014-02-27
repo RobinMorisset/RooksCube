@@ -211,8 +211,8 @@ void Worker<on_initial_line, on_initial_column>::backtrack_pillar(Config * c,
 		c->forbidden_x[i][1] = old_fzx | c->proj_z_y[j];
 		c->forbidden_y[j][0] = old_fxy | c->proj_x_z[k];
 		c->forbidden_y[j][1] = old_fzy | c->proj_z_x[i];
-		c->forbidden_z[k][0] |= c->proj_x_y[j];
-		c->forbidden_z[k][1] |= c->proj_y_x[i];
+		c->forbidden_z[k][0] = old_fxz | c->proj_x_y[j];
+		c->forbidden_z[k][1] = old_fyz | c->proj_y_x[i];
 #if R_OPTIM3
 		if (c->max_z < N && k_1 == c->max_z) {
 			c->max_z++;
