@@ -23,6 +23,34 @@ inline void print_counter(void) {
 inline void update_counter(size_t i) {}
 inline void print_counter(void) {}
 #endif
+
+#if R_OPTIM1
+#define OPTIM1_CHECK(c, i, j) (c->cardinal_x[i] > c->cardinal_x[i+1])
+#define OPTIM1(c, i, j) do { \
+		if (OPTIM1_CHECK(c, i, j)) { \
+			update_counter(1); \
+			return; \
+		} \
+	} while (0)
+#else
+#define OPTIM1_CHECK(c, i, j) false
+#define OPTIM1(c, i, j) do {} while (0)
+#endif
+
+#if R_OPTIM6
+#define OPTIM6_CHECK(c, i, j) (c->cardinal_x[i] == c->cardinal_x[i+1] \
+			&& c->proj_y_x[i] > c->proj_y_x[i+1])
+#define OPTIM6(c, i, j) do { \
+		if (OPTIM6_CHECK(c, i, j)) { \
+			update_counter(6); \
+			return; \
+		} \
+	} while (0)
+#else
+#define OPTIM6_CHECK(c, i, j) false
+#define OPTIM6(c, i, j) do {} while (0)
+#endif
+
 #if R_OPTIM2
 #define OPTIM2_CHECK(c, i, j) (c->proj_x_y[j] > c->proj_x_y[j+1])
 #define OPTIM2(c, i, j) do { \
@@ -134,12 +162,20 @@ void Worker<on_initial_line, on_initial_column>::backtrack_pillar(Config * c,
 	N_BITFIELD old_fzx, old_fzy, old_fyx, old_fyz, old_fxy, old_fxz;
 	// N_BITFIELD2 old_fx;
 
-	c->cardinal_x[i]++;
-	c->proj_y_x[i] |= mask_y;
 	c->proj_x_y[j] |= mask_x;
 	if(OPTIM2_CHECK(c, i, j))
 		goto skip_slot;
 
+	c->cardinal_x[i]++;
+	if(OPTIM1_CHECK(c, i, j)) {
+		c->cardinal_x[i]--;
+		c->proj_x_y[j] ^= mask_x;
+		Worker_next<on_initial_line, on_initial_column, true
+			>::backtrack_next(c, i, 0);
+		return;
+	}
+
+	c->proj_y_x[i] |= mask_y;
 	// Save to restore later
 	// old_fx = (N_BITFIELD2) forbidden_x[i];
 	old_fyx = c->forbidden_x[i][0]; // TODO: save only once per slice
@@ -212,11 +248,10 @@ void Worker<on_initial_line, on_initial_column>::backtrack_pillar(Config * c,
 	// Finally try leaving the pillar empty
 	c->heights[i][j] = 0;
 	c->card--;
-
-skip_slot:
 	c->proj_y_x[i] ^= mask_y;
-	c->proj_x_y[j] ^= mask_x;
 	c->cardinal_x[i]--;
+skip_slot:
+	c->proj_x_y[j] ^= mask_x;
 	Worker_next<on_initial_line, on_initial_column, true
 		>::backtrack_next(c, i, j);
 }
