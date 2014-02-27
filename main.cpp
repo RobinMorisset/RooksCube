@@ -58,7 +58,7 @@ typedef struct Config final {
 
 /* Template black magic, I don't know who designed the C++ templates but
  * they are insane */
-template<bool on_initial_line, bool empty_slot>
+template<bool on_initial_line>
 struct Worker final {
 	static void backtrack(Config * c, N_INDEX, N_INDEX);
 	static void backtrack_pillar(Config * c, N_INDEX, N_INDEX,
@@ -85,10 +85,9 @@ struct Worker_next<false, false> final {
 	static void backtrack_next(Config * c, N_INDEX, N_INDEX);
 };
 
-template<bool on_initial_line, bool empty_slot>
-void Worker<on_initial_line, empty_slot>::backtrack_pillar(Config * c,
+template<bool on_initial_line>
+void Worker<on_initial_line>::backtrack_pillar(Config * c,
 		N_INDEX i, N_INDEX j, N_BITFIELD mask_x, N_BITFIELD mask_y) {
-	assert(empty_slot == true);
 	N_INDEX k, k_1 = 0, offset_k, max_k;
 	N_BITFIELD mask_z, allowed_z, forbidden_z_mix;
 	N_BITFIELD old_fzx, old_fzy, old_fyx, old_fyz, old_fxy, old_fxz;
@@ -259,9 +258,9 @@ void Worker_next<false, true>::backtrack_next(Config * c,
 			update_counter();
 			return;
 		}
-		Worker<false, true>::backtrack(c, i-1, N-1);
+		Worker<false>::backtrack(c, i-1, N-1);
 	} else {
-		Worker<false, true>::backtrack(c, i, j-1);
+		Worker<false>::backtrack(c, i, j-1);
 	}
 }
 
@@ -290,16 +289,15 @@ void Worker_next<true, false>::backtrack_next(Config * c,
 
 	/* Should we change slice ? */
 	if (j == 0) {
-		Worker<false, true>::backtrack(c, i-1, N-1);
+		Worker<false>::backtrack(c, i-1, N-1);
 	} else {
-		Worker<true, true>::backtrack(c, i, j-1);
+		Worker<true>::backtrack(c, i, j-1);
 	}
 }
 
-template<bool on_initial_line, bool empty_slot>
-void Worker<on_initial_line, empty_slot>::backtrack(Config * c,
+template<bool on_initial_line>
+void Worker<on_initial_line>::backtrack(Config * c,
 		N_INDEX i, N_INDEX j) {
-	assert(empty_slot == true);
 	assert(i < N);
 	assert(j < N);
 	N_BITFIELD mask_x = 1 << i;
@@ -359,7 +357,7 @@ int main(int argc, char* argv[])
 	pthread_create(&t, NULL, monitor, &c);
 #endif
 
-	Worker<true, true>::backtrack(&c, N-1, N-1);
+	Worker<true>::backtrack(&c, N-1, N-1);
 
 	print_counter();
 	return 0;
