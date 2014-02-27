@@ -127,8 +127,6 @@ struct Worker_next<true, on_initial_column, true> final {
 template<bool on_initial_column>
 struct Worker_next<true, on_initial_column, false> final {
 	static void backtrack_next(Config * c, N_INDEX i, N_INDEX j) {
-		OPTIM2(c, i, j);
-
 		/* Should we change slice ? */
 		if (j == 0) {
 			Worker<false, true>::backtrack(c, i-1, N-1);
