@@ -158,7 +158,6 @@ void Worker<on_initial_line, on_initial_column>::backtrack_pillar(Config * c,
 	N_INDEX k, k_1 = 0, offset_k, max_k;
 	N_BITFIELD mask_z, allowed_z, forbidden_z_mix;
 	N_BITFIELD old_fzx, old_fzy, old_fyx, old_fyz, old_fxy, old_fxz;
-	// N_BITFIELD2 old_fx;
 
 	c->proj_x_y[j] |= mask_x;
 	if(OPTIM2_CHECK(c, i, j))
@@ -173,7 +172,6 @@ void Worker<on_initial_line, on_initial_column>::backtrack_pillar(Config * c,
 
 	c->proj_y_x[i] |= mask_y;
 	// Save to restore later
-	// old_fx = (N_BITFIELD2) forbidden_x[i];
 	old_fyx = c->forbidden_x[i][0]; // TODO: save only once per slice
 	old_fzx = c->forbidden_x[i][1];
 	old_fxy = c->forbidden_y[j][0];
@@ -209,12 +207,12 @@ void Worker<on_initial_line, on_initial_column>::backtrack_pillar(Config * c,
 		c->proj_z_y[j] |= mask_z;
 		c->proj_y_z[k] |= mask_y;
 		c->proj_x_z[k] |= mask_x;
-		c->forbidden_x[i][1] |= c->proj_z_y[j];
-		c->forbidden_y[j][1] |= c->proj_z_x[i];
-		c->forbidden_x[i][0] |= c->proj_y_z[k];
-		c->forbidden_z[k][1] |= c->proj_y_x[i];
-		c->forbidden_y[j][0] |= c->proj_x_z[k];
+		c->forbidden_x[i][0] = old_fyx | c->proj_y_z[k];
+		c->forbidden_x[i][1] = old_fzx | c->proj_z_y[j];
+		c->forbidden_y[j][0] = old_fxy | c->proj_x_z[k];
+		c->forbidden_y[j][1] = old_fzy | c->proj_z_x[i];
 		c->forbidden_z[k][0] |= c->proj_x_y[j];
+		c->forbidden_z[k][1] |= c->proj_y_x[i];
 #if R_OPTIM3
 		if (c->max_z < N && k_1 == c->max_z) {
 			c->max_z++;
@@ -228,13 +226,12 @@ void Worker<on_initial_line, on_initial_column>::backtrack_pillar(Config * c,
 				>::backtrack_next(c, i, j);
 
 		// Restore old values
-		c->forbidden_x[i][1] = old_fzx;
-		c->forbidden_y[j][1] = old_fzy;
 		c->forbidden_x[i][0] = old_fyx;
-		c->forbidden_z[k][1] = old_fyz;
+		c->forbidden_x[i][1] = old_fzx;
 		c->forbidden_y[j][0] = old_fxy;
+		c->forbidden_y[j][1] = old_fzy;
 		c->forbidden_z[k][0] = old_fxz;
-		// forbidden_x[i] = old_fx;
+		c->forbidden_z[k][1] = old_fyz;
 		c->proj_z_x[i] ^= mask_z;
 		c->proj_z_y[j] ^= mask_z;
 		c->proj_y_z[k] ^= mask_y;
