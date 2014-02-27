@@ -6,6 +6,7 @@
 #include <pthread.h>
 
 #define N_BITFIELD uint32_t
+#define N_BITFIELD2 uint64_t
 #define N_INDEX size_t
 #define FFS_BITFIELD(x) __builtin_ffs(x)
 
@@ -37,12 +38,9 @@ inline void print_counter(void) {}
 template<bool on_initial_line>
 struct Config final {
 	// the index corresponds to x, the bitfield to a 'pillar' (z)
-	N_BITFIELD forbidden_z_x[N];
-	N_BITFIELD forbidden_z_y[N];
-	N_BITFIELD forbidden_y_x[N];
-	N_BITFIELD forbidden_y_z[N];
-	N_BITFIELD forbidden_x_y[N];
-	N_BITFIELD forbidden_x_z[N];
+	N_BITFIELD forbidden_x[N][2];
+	N_BITFIELD forbidden_y[N][2];
+	N_BITFIELD forbidden_z[N][2];
 	N_BITFIELD proj_z_x[N];
 	N_BITFIELD proj_z_y[N];
 	N_BITFIELD proj_y_z[N];
@@ -66,14 +64,16 @@ template<bool on_initial_line>
 void Config<on_initial_line>::backtrack_pillar(
 		N_INDEX i, N_INDEX j, N_BITFIELD mask_x, N_BITFIELD mask_y) {
 	N_INDEX k, k_1 = 0, offset_k, max_k;
-	N_BITFIELD mask_z, allowed_z, forbidden_z;
+	N_BITFIELD mask_z, allowed_z, forbidden_z_mix;
 	N_BITFIELD old_fzx, old_fzy, old_fyx, old_fyz, old_fxy, old_fxz;
+	// N_BITFIELD2 old_fx;
 
 	// Save to restore later
-	old_fzx = forbidden_z_x[i]; // TODO: save only once per slice
-	old_fyx = forbidden_y_x[i];
-	old_fzy = forbidden_z_y[j];
-	old_fxy = forbidden_x_y[j];
+	// old_fx = (N_BITFIELD2) forbidden_x[i];
+	old_fyx = forbidden_x[i][0]; // TODO: save only once per slice
+	old_fzx = forbidden_x[i][1];
+	old_fxy = forbidden_y[j][0];
+	old_fzy = forbidden_y[j][1];
 	assert(i < N);
 	assert(j < N);
 	card++;
@@ -87,20 +87,20 @@ void Config<on_initial_line>::backtrack_pillar(
 #else
 	max_k = N;
 #endif
-	forbidden_z = forbidden_z_x[i] | forbidden_z_y[j];
-	allowed_z = (~forbidden_z) & ((1 << max_k) - 1); // TODO: optimize
+	forbidden_z_mix = forbidden_x[i][1] | forbidden_y[j][1];
+	allowed_z = (~forbidden_z_mix) & ((1 << max_k) - 1); // TODO: optimize
 	while ((offset_k = FFS_BITFIELD(allowed_z))) {
 		k_1 += offset_k;
 		allowed_z = allowed_z >> offset_k;
 		k = k_1 - 1;
-		if ((mask_x & forbidden_x_z[k])
-				|| (mask_y & forbidden_y_z[k]))
+		if ((mask_x & forbidden_z[k][0])
+				|| (mask_y & forbidden_z[k][1]))
 			continue;
 		mask_z = 1 << k;
 
 		// Save to restore later
-		old_fyz = forbidden_y_z[k];
-		old_fxz = forbidden_x_z[k];
+		old_fyz = forbidden_z[k][1];
+		old_fxz = forbidden_z[k][0];
 
 		// Add the rook
 		heights[i][j] = k_1; // because 0 is no rook
@@ -108,12 +108,12 @@ void Config<on_initial_line>::backtrack_pillar(
 		proj_z_y[j] |= mask_z;
 		proj_y_z[k] |= mask_y;
 		proj_x_z[k] |= mask_x;
-		forbidden_z_x[i] |= proj_z_y[j];
-		forbidden_z_y[j] |= proj_z_x[i];
-		forbidden_y_x[i] |= proj_y_z[k];
-		forbidden_y_z[k] |= proj_y_x[i];
-		forbidden_x_y[j] |= proj_x_z[k];
-		forbidden_x_z[k] |= proj_x_y[j];
+		forbidden_x[i][1] |= proj_z_y[j];
+		forbidden_y[j][1] |= proj_z_x[i];
+		forbidden_x[i][0] |= proj_y_z[k];
+		forbidden_z[k][1] |= proj_y_x[i];
+		forbidden_y[j][0] |= proj_x_z[k];
+		forbidden_z[k][0] |= proj_x_y[j];
 #if R_OPTIM3
 		if (max_z < N && k_1 == max_z) {
 			max_z++;
@@ -125,12 +125,13 @@ void Config<on_initial_line>::backtrack_pillar(
 			backtrack_next(i, j);
 
 		// Restore old values
-		forbidden_z_x[i] = old_fzx;
-		forbidden_z_y[j] = old_fzy;
-		forbidden_y_x[i] = old_fyx;
-		forbidden_y_z[k] = old_fyz;
-		forbidden_x_y[j] = old_fxy;
-		forbidden_x_z[k] = old_fxz;
+		forbidden_x[i][1] = old_fzx;
+		forbidden_y[j][1] = old_fzy;
+		forbidden_x[i][0] = old_fyx;
+		forbidden_z[k][1] = old_fyz;
+		forbidden_y[j][0] = old_fxy;
+		forbidden_z[k][0] = old_fxz;
+		// forbidden_x[i] = old_fx;
 		proj_z_x[i] ^= mask_z;
 		proj_z_y[j] ^= mask_z;
 		proj_y_z[k] ^= mask_y;
@@ -143,6 +144,7 @@ void Config<on_initial_line>::backtrack_pillar(
 	proj_x_y[j] ^= mask_x;
 	card--;
 	cardinal_x[i]--;
+	// TODO: predicate the optims on last_pillar_empty or not
 	backtrack_next(i, j);
 }
 
@@ -265,8 +267,8 @@ void Config<on_initial_line>::backtrack(N_INDEX i, N_INDEX j) {
 	assert(j < N);
 	N_BITFIELD mask_x = 1 << i;
 	N_BITFIELD mask_y = 1 << j;
-	if ((forbidden_y_x[i] & mask_y)
-			|| (forbidden_x_y[j] & mask_x))
+	if ((forbidden_x[i][0] & mask_y)
+			|| (forbidden_y[j][0] & mask_x))
 		backtrack_next(i, j);
 	else
 		backtrack_pillar(i, j, mask_x, mask_y);
@@ -292,12 +294,11 @@ int main(int argc, char* argv[])
 			c.heights[i][j] = 0;
 			c.best_heights[i][j] = 0;
 		}
-		c.forbidden_z_x[i] = 0;
-		c.forbidden_z_y[i] = 0;
-		c.forbidden_y_x[i] = 0;
-		c.forbidden_y_z[i] = 0;
-		c.forbidden_x_y[i] = 0;
-		c.forbidden_x_z[i] = 0;
+		for (size_t j = 0; j < 2; j++) {
+			c.forbidden_x[i][j] = 0;
+			c.forbidden_y[i][j] = 0;
+			c.forbidden_z[i][j] = 0;
+		}
 		c.proj_z_x[i] = 0;
 		c.proj_z_y[i] = 0;
 		c.proj_y_z[i] = 0;
