@@ -34,10 +34,8 @@ inline void update_counter_6(void){}
 inline void print_counter(void) {}
 #endif
 
+template<bool on_initial_line>
 struct Config final {
-	char max_z;
-	char card;
-	char best_card;
 	// the index corresponds to x, the bitfield to a 'pillar' (z)
 	N_BITFIELD forbidden_z_x[N];
 	N_BITFIELD forbidden_z_y[N];
@@ -48,12 +46,15 @@ struct Config final {
 	N_BITFIELD proj_z_x[N];
 	N_BITFIELD proj_z_y[N];
 	N_BITFIELD proj_y_z[N];
-	N_BITFIELD proj_y_x[N+1];
-	N_BITFIELD proj_x_y[N];
+	N_BITFIELD proj_y_x[N];
+	N_BITFIELD proj_x_y[N+1];
 	N_BITFIELD proj_x_z[N];
 	char heights[N][N];
 	char best_heights[N][N];
-	char cardinal_x[N+1];
+	char cardinal_x[N];
+	char max_z;
+	char card;
+	char best_card;
 	void backtrack(N_INDEX, N_INDEX);
 	void backtrack_next(N_INDEX, N_INDEX);
 	void backtrack_pillar(N_INDEX, N_INDEX, N_BITFIELD, N_BITFIELD);
@@ -61,8 +62,8 @@ struct Config final {
 	void update_best();
 };
 
-
-void Config::backtrack_pillar(
+template<bool on_initial_line>
+void Config<on_initial_line>::backtrack_pillar(
 		N_INDEX i, N_INDEX j, N_BITFIELD mask_x, N_BITFIELD mask_y) {
 	N_INDEX k, k_1 = 0, offset_k, max_k;
 	N_BITFIELD mask_z, allowed_z, forbidden_z;
@@ -154,7 +155,8 @@ void print_rook(uint8_t h) {
 		printf("%c ", 'A' + h - 10);
 }
 
-void Config::print_config() {
+template<bool on_initial_line>
+void Config<on_initial_line>::print_config() {
 	for (N_INDEX i = 0; i < N; i++) {
 		for (N_INDEX j = 0; j < N; j++) {
 			print_rook(heights[i][j]);
@@ -164,7 +166,8 @@ void Config::print_config() {
 	printf("result: %i | %i\n\n", card, best_card);
 }
 
-void Config::update_best() {
+template<bool on_initial_line>
+void Config<on_initial_line>::update_best() {
 	for (N_INDEX i = 0; i < N; i++) {
 		for (N_INDEX j = 0; j < N; j++)
 			best_heights[i][j] =
@@ -178,7 +181,8 @@ void Config::update_best() {
 }
 
 // TODO: check validity of adding rooks before adding them
-void Config::backtrack_next(N_INDEX i, N_INDEX j) {
+template<>
+void Config<false>::backtrack_next(N_INDEX i, N_INDEX j) {
 #if R_OPTIM4
 	/* Do we have a chance at beating the record ? */
 	int max_available_slots = cardinal_x[i+1]*i + j;
@@ -193,8 +197,6 @@ void Config::backtrack_next(N_INDEX i, N_INDEX j) {
 		return;
 	}
 #endif
-
-
 #if R_OPTIM6
 	if (cardinal_x[i] == cardinal_x[i+1]
 			&& proj_y_x[i] > proj_y_x[i+1]) {
@@ -204,7 +206,7 @@ void Config::backtrack_next(N_INDEX i, N_INDEX j) {
 #endif
 #if R_OPTIM2
 	/* Keep co-slices sorted */
-	if (j < N - 1 && proj_x_y[j] > proj_x_y[j+1]) {
+	if (proj_x_y[j] > proj_x_y[j+1]) {
 		update_counter_2();
 		return;
 	}
@@ -232,7 +234,33 @@ void Config::backtrack_next(N_INDEX i, N_INDEX j) {
 	}
 }
 
-void Config::backtrack(N_INDEX i, N_INDEX j) {
+template<>
+void Config<true>::backtrack_next(N_INDEX i, N_INDEX j) {
+#if R_OPTIM4
+	/* Do we have a chance at beating the record ? */
+	if (N*(card + j) <= best_card) {
+		update_counter_4();
+		return;
+	}
+#endif
+#if R_OPTIM2
+	/* Keep co-slices sorted */
+	if (proj_x_y[j] > proj_x_y[j+1]) {
+		update_counter_2();
+		return;
+	}
+#endif
+
+	/* Should we change slice ? */
+	if (j == 0) {
+		((Config<false> *) this)->backtrack(i-1, N-1);
+	} else {
+		backtrack(i, j-1);
+	}
+}
+
+template<bool on_initial_line>
+void Config<on_initial_line>::backtrack(N_INDEX i, N_INDEX j) {
 	assert(i < N);
 	assert(j < N);
 	N_BITFIELD mask_x = 1 << i;
@@ -247,7 +275,7 @@ void Config::backtrack(N_INDEX i, N_INDEX j) {
 void * monitor(void *c) {
 	for(;;) {
 		sleep(1);
-		((struct Config *) c)->print_config();
+		((struct Config<true> *) c)->print_config();
 	}
 }
 
@@ -256,7 +284,7 @@ int main(int argc, char* argv[])
 #if ROOKS_MONITOR
 	pthread_t t;
 #endif
-	struct Config c;
+	struct Config<true> c;
 
 	/* Initialisation */
 	for (N_INDEX i = 0; i < N; i++) {
@@ -278,8 +306,7 @@ int main(int argc, char* argv[])
 		c.proj_x_z[i] = 0;
 		c.cardinal_x[i] = 0;
 	}
-	c.cardinal_x[N] = N;
-	c.proj_y_x[N] = (N_BITFIELD) (-1);
+	c.proj_x_y[N] = (N_BITFIELD) (-1);
 	c.card = 0;
 #ifndef R_BEST
 	c.best_card = 0;
