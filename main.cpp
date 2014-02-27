@@ -24,6 +24,30 @@ inline void update_counter(size_t i) {}
 inline void print_counter(void) {}
 #endif
 
+#if R_OPTIM2
+#define OPTIM2() do { \
+		/* Keep co-slices sorted */ \
+		if (c->proj_x_y[j] > c->proj_x_y[j+1]) { \
+			update_counter(2); \
+			return; \
+		} \
+	} while (0)
+#else
+#define OPTIM2() do {} while(0)
+#endif
+
+#if R_OPTIM4
+#define OPTIM4_INITIAL_LINE() do { \
+		/* Do we have a chance at beating the record ? */ \
+		if (N*(c->card + j) <= c->best_card) { \
+			update_counter(4); \
+			return; \
+		} \
+	} while(0)
+#else
+#define OPTIM4_INITIAL_LINE() do {} while(0)
+#endif
+
 typedef struct Config final {
 	// the index corresponds to x, the bitfield to a 'pillar' (z)
 	N_BITFIELD forbidden_x[N][2];
@@ -47,35 +71,62 @@ typedef struct Config final {
 
 /* Template black magic, I don't know who designed the C++ templates but
  * they are insane */
-template<bool on_initial_line>
+template<bool on_initial_line, bool on_initial_column>
 struct Worker final {
 	static void backtrack(Config * c, N_INDEX, N_INDEX);
 	static void backtrack_pillar(Config * c, N_INDEX, N_INDEX,
 			N_BITFIELD, N_BITFIELD);
 };
-template<bool on_initial_line, bool empty_slot>
+template<bool on_initial_line, bool on_initial_column, bool empty_slot>
 struct Worker_next final {
 	static void backtrack_next(Config * c, N_INDEX, N_INDEX);
 };
+template<bool on_initial_column>
+struct Worker_next<true, on_initial_column, true> final {
+	static void backtrack_next(Config * c, N_INDEX i, N_INDEX j) {
+		OPTIM4_INITIAL_LINE();
+
+		// TODO: refactor into yet another kind of Worker
+		/* Should we change slice ? */
+		if (j == 0) {
+			Worker<false, true>::backtrack(c, i-1, N-1);
+		} else {
+			Worker<true, false>::backtrack(c, i, j-1);
+		}
+	}
+};
+template<bool on_initial_column>
+struct Worker_next<true, on_initial_column, false> final {
+	static void backtrack_next(Config * c, N_INDEX i, N_INDEX j) {
+		OPTIM2();
+
+		/* Should we change slice ? */
+		if (j == 0) {
+			Worker<false, true>::backtrack(c, i-1, N-1);
+		} else {
+			Worker<true, false>::backtrack(c, i, j-1);
+		}
+	}
+};
 template<>
-struct Worker_next<true, true> final {
+struct Worker_next<false, true, true> final {
 	static void backtrack_next(Config * c, N_INDEX, N_INDEX);
 };
 template<>
-struct Worker_next<true, false> final {
+struct Worker_next<false, true, false> final {
 	static void backtrack_next(Config * c, N_INDEX, N_INDEX);
 };
 template<>
-struct Worker_next<false, true> final {
+struct Worker_next<false, false, true> final {
 	static void backtrack_next(Config * c, N_INDEX, N_INDEX);
 };
 template<>
-struct Worker_next<false, false> final {
+struct Worker_next<false, false, false> final {
 	static void backtrack_next(Config * c, N_INDEX, N_INDEX);
 };
 
-template<bool on_initial_line>
-void Worker<on_initial_line>::backtrack_pillar(Config * c,
+template<bool on_initial_line, bool on_initial_column>
+void Worker<on_initial_line, on_initial_column>::backtrack_pillar(Config * c,
 		N_INDEX i, N_INDEX j, N_BITFIELD mask_x, N_BITFIELD mask_y) {
 	N_INDEX k, k_1 = 0, offset_k, max_k;
 	N_BITFIELD mask_z, allowed_z, forbidden_z_mix;
@@ -132,11 +183,13 @@ void Worker<on_initial_line>::backtrack_pillar(Config * c,
 		if (c->max_z < N && k_1 == c->max_z) {
 			c->max_z++;
 			// Recursive call to backtrack
-			Worker_next<on_initial_line, false>::backtrack_next(c, i, j);
+			Worker_next<on_initial_line, on_initial_column, false
+				>::backtrack_next(c, i, j);
 			c->max_z--;
 		} else
 #endif
-			Worker_next<on_initial_line, false>::backtrack_next(c, i, j);
+			Worker_next<on_initial_line, on_initial_column, false
+				>::backtrack_next(c, i, j);
 
 		// Restore old values
 		c->forbidden_x[i][1] = old_fzx;
@@ -158,7 +211,8 @@ void Worker<on_initial_line>::backtrack_pillar(Config * c,
 	c->proj_x_y[j] ^= mask_x;
 	c->card--;
 	c->cardinal_x[i]--;
-	Worker_next<on_initial_line, true>::backtrack_next(c, i, j);
+	Worker_next<on_initial_line, on_initial_column, true
+		>::backtrack_next(c, i, j);
 }
 
 void print_rook(uint8_t h) {
@@ -193,7 +247,12 @@ void Config::update_best() {
 #endif
 }
 
-void Worker_next<false, false>::backtrack_next(Config * c,
+void Worker_next<false, true, false>::backtrack_next(Config * c,
+		N_INDEX i, N_INDEX j) {
+	Worker<false, false>::backtrack(c, i, j-1);
+}
+
+void Worker_next<false, false, false>::backtrack_next(Config * c,
 		N_INDEX i, N_INDEX j) {
 #if R_OPTIM1
 	if (c->cardinal_x[i] > c->cardinal_x[i+1]) {
@@ -232,14 +291,18 @@ void Worker_next<false, false>::backtrack_next(Config * c,
 			update_counter(0);
 			return;
 		}
-		Worker<false>::backtrack(c, i-1, N-1);
+		Worker<false, true>::backtrack(c, i-1, N-1);
 	} else {
-		Worker<false>::backtrack(c, i, j-1);
+		Worker<false, false>::backtrack(c, i, j-1);
 	}
 }
 
-// TODO: check validity of adding rooks before adding them
-void Worker_next<false, true>::backtrack_next(Config * c,
+void Worker_next<false, true, true>::backtrack_next(Config * c,
+		N_INDEX i, N_INDEX j) {
+	Worker<false, false>::backtrack(c, i, j-1);
+}
+
+void Worker_next<false, false, true>::backtrack_next(Config * c,
 		N_INDEX i, N_INDEX j) {
 #if R_OPTIM4
 	/* Do we have a chance at beating the record ? */
@@ -265,50 +328,14 @@ void Worker_next<false, true>::backtrack_next(Config * c,
 			update_counter(0);
 			return;
 		}
-		Worker<false>::backtrack(c, i-1, N-1);
+		Worker<false, true>::backtrack(c, i-1, N-1);
 	} else {
-		Worker<false>::backtrack(c, i, j-1);
+		Worker<false, false>::backtrack(c, i, j-1);
 	}
 }
 
-void Worker_next<true, true>::backtrack_next(Config * c,
-		N_INDEX i, N_INDEX j) {
-#if R_OPTIM4
-	/* Do we have a chance at beating the record ? */
-	if (N*(c->card + j) <= c->best_card) {
-		update_counter(4);
-		return;
-	}
-#endif
-
-/* Should we change slice ? */
-	if (j == 0) {
-		Worker<false>::backtrack(c, i-1, N-1);
-	} else {
-		Worker<true>::backtrack(c, i, j-1);
-	}
-}
-
-void Worker_next<true, false>::backtrack_next(Config * c,
-		N_INDEX i, N_INDEX j) {
-#if R_OPTIM2
-	/* Keep co-slices sorted */
-	if (c->proj_x_y[j] > c->proj_x_y[j+1]) {
-		update_counter(2);
-		return;
-	}
-#endif
-
-	/* Should we change slice ? */
-	if (j == 0) {
-		Worker<false>::backtrack(c, i-1, N-1);
-	} else {
-		Worker<true>::backtrack(c, i, j-1);
-	}
-}
-
-template<bool on_initial_line>
-void Worker<on_initial_line>::backtrack(Config * c,
+template<bool on_initial_line, bool on_initial_column>
+void Worker<on_initial_line, on_initial_column>::backtrack(Config * c,
 		N_INDEX i, N_INDEX j) {
 	assert(i < N);
 	assert(j < N);
@@ -317,7 +344,7 @@ void Worker<on_initial_line>::backtrack(Config * c,
 
 	if ((c->forbidden_x[i][0] & mask_y)
 			|| (c->forbidden_y[j][0] & mask_x))
-		Worker_next<on_initial_line, true>::backtrack_next(c, i, j);
+		Worker_next<on_initial_line, on_initial_column, true>::backtrack_next(c, i, j);
 	else
 		backtrack_pillar(c, i, j, mask_x, mask_y);
 }
@@ -369,7 +396,7 @@ int main(int argc, char* argv[])
 	pthread_create(&t, NULL, monitor, &c);
 #endif
 
-	Worker<true>::backtrack(&c, N-1, N-1);
+	Worker<true, true>::backtrack(&c, N-1, N-1);
 
 	print_counter();
 	return 0;
