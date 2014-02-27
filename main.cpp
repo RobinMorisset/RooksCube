@@ -23,17 +23,18 @@ inline void print_counter(void) {
 inline void update_counter(size_t i) {}
 inline void print_counter(void) {}
 #endif
-
 #if R_OPTIM2
-#define OPTIM2() do { \
+#define OPTIM2_CHECK(c, i, j) (c->proj_x_y[j] > c->proj_x_y[j+1])
+#define OPTIM2(c, i, j) do { \
 		/* Keep co-slices sorted */ \
-		if (c->proj_x_y[j] > c->proj_x_y[j+1]) { \
+		if (OPTIM2_CHECK(c, i, j)) { \
 			update_counter(2); \
 			return; \
 		} \
 	} while (0)
 #else
-#define OPTIM2() do {} while(0)
+#define OPTIM2_CHECK(c, i, j) false
+#define OPTIM2(c, i, j) do {} while(0)
 #endif
 
 #if R_OPTIM4
@@ -98,7 +99,7 @@ struct Worker_next<true, on_initial_column, true> final {
 template<bool on_initial_column>
 struct Worker_next<true, on_initial_column, false> final {
 	static void backtrack_next(Config * c, N_INDEX i, N_INDEX j) {
-		OPTIM2();
+		OPTIM2(c, i, j);
 
 		/* Should we change slice ? */
 		if (j == 0) {
@@ -133,6 +134,12 @@ void Worker<on_initial_line, on_initial_column>::backtrack_pillar(Config * c,
 	N_BITFIELD old_fzx, old_fzy, old_fyx, old_fyz, old_fxy, old_fxz;
 	// N_BITFIELD2 old_fx;
 
+	c->cardinal_x[i]++;
+	c->proj_y_x[i] |= mask_y;
+	c->proj_x_y[j] |= mask_x;
+	if(OPTIM2_CHECK(c, i, j))
+		goto skip_slot;
+
 	// Save to restore later
 	// old_fx = (N_BITFIELD2) forbidden_x[i];
 	old_fyx = c->forbidden_x[i][0]; // TODO: save only once per slice
@@ -142,9 +149,6 @@ void Worker<on_initial_line, on_initial_column>::backtrack_pillar(Config * c,
 	assert(i < N);
 	assert(j < N);
 	c->card++;
-	c->cardinal_x[i]++;
-	c->proj_y_x[i] |= mask_y;
-	c->proj_x_y[j] |= mask_x;
 
 #if R_OPTIM3
 	/* Optimisation: only use heights in order */
@@ -207,9 +211,11 @@ void Worker<on_initial_line, on_initial_column>::backtrack_pillar(Config * c,
 
 	// Finally try leaving the pillar empty
 	c->heights[i][j] = 0;
+	c->card--;
+
+skip_slot:
 	c->proj_y_x[i] ^= mask_y;
 	c->proj_x_y[j] ^= mask_x;
-	c->card--;
 	c->cardinal_x[i]--;
 	Worker_next<on_initial_line, on_initial_column, true
 		>::backtrack_next(c, i, j);
@@ -267,13 +273,7 @@ void Worker_next<false, false, false>::backtrack_next(Config * c,
 		return;
 	}
 #endif
-#if R_OPTIM2
-	/* Keep co-slices sorted */
-	if (c->proj_x_y[j] > c->proj_x_y[j+1]) {
-		update_counter(2);
-		return;
-	}
-#endif
+	OPTIM2(c, i, j);
 
 /* Should we change slice ? */
 	if (j == 0) {
