@@ -98,6 +98,10 @@ typedef struct Config final {
 	void update_best();
 } Config;
 
+inline void __attribute__((always_inline))
+	recurse_initial_line(Config *, N_INDEX, N_INDEX);
+inline void __attribute__((always_inline)) recurse(Config *, N_INDEX, N_INDEX);
+
 /* Template black magic, I don't know who designed the C++ templates but
  * they are insane */
 template<bool on_initial_line, bool on_initial_column>
@@ -112,25 +116,13 @@ template<bool on_initial_column>
 struct Worker_next<true, on_initial_column, true> final {
 	static void backtrack_next(Config * c, N_INDEX i, N_INDEX j) {
 		OPTIM4_INITIAL_LINE();
-
-		// TODO: refactor
-		/* Should we change slice ? */
-		if (j == 0) {
-			Worker<false, true>::backtrack(c, i-1, N-1);
-		} else {
-			Worker<true, false>::backtrack(c, i, j-1);
-		}
+		recurse_initial_line(c, i, j);
 	}
 };
 template<bool on_initial_column>
 struct Worker_next<true, on_initial_column, false> final {
 	static void backtrack_next(Config * c, N_INDEX i, N_INDEX j) {
-		/* Should we change slice ? */
-		if (j == 0) {
-			Worker<false, true>::backtrack(c, i-1, N-1);
-		} else {
-			Worker<true, false>::backtrack(c, i, j-1);
-		}
+		recurse_initial_line(c, i, j);
 	}
 };
 template<>
@@ -149,6 +141,40 @@ template<>
 struct Worker_next<false, false, false> final {
 	static void backtrack_next(Config * c, N_INDEX, N_INDEX);
 };
+
+inline void __attribute__((always_inline))
+		recurse_initial_line(Config * c, N_INDEX i, N_INDEX j) {
+	/* Should we change slice ? */
+	if (j == 0) {
+		Worker<false, true>::backtrack(c, i-1, N-1);
+	} else {
+		Worker<true, false>::backtrack(c, i, j-1);
+	}
+}
+
+inline void __attribute__((always_inline))
+		recurse(Config * c, N_INDEX i, N_INDEX j) {
+/* Should we change slice ? */
+	if (j == 0) {
+#if R_OPTIM5
+		if (c->cardinal_x[i]+1 < c->cardinal_x[N-1]) {
+			update_counter(5);
+			return;
+		}
+#endif
+		/* Are we at the end ? */
+		if (i == 0) {
+			if (c->card > c->best_card) {
+				c->update_best();
+			}
+			update_counter(0);
+			return;
+		}
+		Worker<false, true>::backtrack(c, i-1, N-1);
+	} else {
+		Worker<false, false>::backtrack(c, i, j-1);
+	}
+}
 
 template<bool on_initial_line, bool on_initial_column>
 void Worker<on_initial_line, on_initial_column>::backtrack(Config * c,
@@ -313,27 +339,7 @@ void Worker_next<false, false, false>::backtrack_next(Config * c,
 	}
 #endif
 	OPTIM2(c, i, j);
-
-/* Should we change slice ? */
-	if (j == 0) {
-#if R_OPTIM5
-		if (c->cardinal_x[i]+1 < c->cardinal_x[N-1]) {
-			update_counter(5);
-			return;
-		}
-#endif
-		/* Are we at the end ? */
-		if (i == 0) {
-			if (c->card > c->best_card) {
-				c->update_best();
-			}
-			update_counter(0);
-			return;
-		}
-		Worker<false, true>::backtrack(c, i-1, N-1);
-	} else {
-		Worker<false, false>::backtrack(c, i, j-1);
-	}
+	recurse(c, i, j);
 }
 
 void Worker_next<false, true, true>::backtrack_next(Config * c,
@@ -351,26 +357,7 @@ void Worker_next<false, false, true>::backtrack_next(Config * c,
 		return;
 	}
 #endif
-	/* Should we change slice ? */
-	if (j == 0) {
-#if R_OPTIM5
-		if (c->cardinal_x[i]+1 < c->cardinal_x[N-1]) {
-			update_counter(5);
-			return;
-		}
-#endif
-		/* Are we at the end ? */
-		if (i == 0) {
-			if (c->card > c->best_card) {
-				c->update_best();
-			}
-			update_counter(0);
-			return;
-		}
-		Worker<false, true>::backtrack(c, i-1, N-1);
-	} else {
-		Worker<false, false>::backtrack(c, i, j-1);
-	}
+	recurse(c, i, j);
 }
 
 void * monitor(void *c) {
