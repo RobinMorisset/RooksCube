@@ -180,6 +180,11 @@ inline void __attribute__((always_inline))
 			return;
 		}
 #endif
+#if R_MAX
+		if ((c->cardinal_x[N-1]-1)*i + c->card > R_MAX) {
+			return;
+		}
+#endif
 		/* Are we at the end ? */
 		if (i == 0) {
 			if (c->card > c->best_card) {
@@ -374,10 +379,10 @@ int main(int argc, char* argv[])
 	}
 	c.proj_x_y[N] = (N_BITFIELD) (-1);
 	c.card = 0;
-#ifndef R_BEST
+#ifndef R_MIN
 	c.best_card = 0;
 #else
-	c.best_card = R_BEST;
+	c.best_card = R_MIN - 1;
 #endif
 	c.max_z = 1;
 
