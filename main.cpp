@@ -218,8 +218,9 @@ void Worker<on_initial_line, on_initial_column>::backtrack(Config * c,
 	c->cardinal_x[i]++;
 	if(OPTIM1_CHECK(c, i, j)) {
 		c->cardinal_x[i]--;
+		c->proj_x_y[j] ^= mask_x;
 		j = 0; // skips ahead to the end of the line
-		goto skip_slot_optim2;
+		goto skip_slot_forbidden;
 	}
 
 	c->proj_y_x[i] |= mask_y;
