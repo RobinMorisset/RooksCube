@@ -103,8 +103,6 @@ typedef struct Config final {
 template<bool on_initial_line, bool on_initial_column>
 struct Worker final {
 	static void backtrack(Config * c, N_INDEX, N_INDEX);
-	static void backtrack_pillar(Config * c, N_INDEX, N_INDEX,
-			N_BITFIELD, N_BITFIELD);
 };
 template<bool on_initial_line, bool on_initial_column, bool empty_slot>
 struct Worker_next final {
@@ -153,21 +151,31 @@ struct Worker_next<false, false, false> final {
 };
 
 template<bool on_initial_line, bool on_initial_column>
-void Worker<on_initial_line, on_initial_column>::backtrack_pillar(Config * c,
-		N_INDEX i, N_INDEX j, N_BITFIELD mask_x, N_BITFIELD mask_y) {
+void Worker<on_initial_line, on_initial_column>::backtrack(Config * c,
+		N_INDEX i, N_INDEX j) {
+	assert(i < N);
+	assert(j < N);
+
 	N_INDEX k, k_1 = 0, offset_k, max_k;
 	N_BITFIELD mask_z, allowed_z, forbidden_z_mix;
 	N_BITFIELD old_fzx, old_fzy, old_fyx, old_fyz, old_fxy, old_fxz;
 
+	N_BITFIELD mask_x = 1 << i;
+	N_BITFIELD mask_y = 1 << j;
+
+	if ((c->forbidden_x[i][0] & mask_y)
+			|| (c->forbidden_y[j][0] & mask_x))
+		goto skip_slot_forbidden;
+
 	c->proj_x_y[j] |= mask_x;
 	if(OPTIM2_CHECK(c, i, j))
-		goto skip_slot;
+		goto skip_slot_optim2;
 
 	c->cardinal_x[i]++;
 	if(OPTIM1_CHECK(c, i, j)) {
 		c->cardinal_x[i]--;
 		j = 0; // skips ahead to the end of the line
-		goto skip_slot;
+		goto skip_slot_optim2;
 	}
 
 	c->proj_y_x[i] |= mask_y;
@@ -245,8 +253,9 @@ void Worker<on_initial_line, on_initial_column>::backtrack_pillar(Config * c,
 	c->card--;
 	c->proj_y_x[i] ^= mask_y;
 	c->cardinal_x[i]--;
-skip_slot:
+skip_slot_optim2:
 	c->proj_x_y[j] ^= mask_x;
+skip_slot_forbidden:
 	Worker_next<on_initial_line, on_initial_column, true
 		>::backtrack_next(c, i, j);
 }
@@ -362,21 +371,6 @@ void Worker_next<false, false, true>::backtrack_next(Config * c,
 	} else {
 		Worker<false, false>::backtrack(c, i, j-1);
 	}
-}
-
-template<bool on_initial_line, bool on_initial_column>
-void Worker<on_initial_line, on_initial_column>::backtrack(Config * c,
-		N_INDEX i, N_INDEX j) {
-	assert(i < N);
-	assert(j < N);
-	N_BITFIELD mask_x = 1 << i;
-	N_BITFIELD mask_y = 1 << j;
-
-	if ((c->forbidden_x[i][0] & mask_y)
-			|| (c->forbidden_y[j][0] & mask_x))
-		Worker_next<on_initial_line, on_initial_column, true>::backtrack_next(c, i, j);
-	else
-		backtrack_pillar(c, i, j, mask_x, mask_y);
 }
 
 void * monitor(void *c) {
