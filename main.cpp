@@ -117,6 +117,7 @@ template<bool on_initial_line, bool on_initial_column>
 struct Worker final {
 	static void backtrack(Config * c, N_INDEX, N_INDEX);
 };
+
 template<bool on_initial_line, bool on_initial_column, bool empty_slot>
 struct Worker_next final {
 	static void backtrack_next(Config * c, N_INDEX, N_INDEX);
@@ -134,27 +135,23 @@ struct Worker_next<true, on_initial_column, false> final {
 		recurse_initial_line(c, i, j);
 	}
 };
-template<>
-struct Worker_next<false, true, true> final {
+template<> struct Worker_next<false, true, true> final {
 	static void backtrack_next(Config * c, N_INDEX i, N_INDEX j) {
 		Worker<false, false>::backtrack(c, i, j-1);
 	}
 };
-template<>
-struct Worker_next<false, true, false> final {
+template<> struct Worker_next<false, true, false> final {
 	static void backtrack_next(Config * c, N_INDEX i, N_INDEX j) {
 		Worker<false, false>::backtrack(c, i, j-1);
 	}
 };
-template<>
-struct Worker_next<false, false, true> final {
+template<> struct Worker_next<false, false, true> final {
 	static void backtrack_next(Config * c, N_INDEX i, N_INDEX j) {
 		OPTIM4();
 		recurse(c, i, j);
 	}
 };
-template<>
-struct Worker_next<false, false, false> final {
+template<> struct Worker_next<false, false, false> final {
 	static void backtrack_next(Config * c, N_INDEX i, N_INDEX j) {
 		OPTIM1(c, i, j);
 		OPTIM6(c, i, j);
