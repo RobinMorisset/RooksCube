@@ -90,10 +90,10 @@ typedef struct Config final {
 	N_BITFIELD proj_x_z[N];
 	char heights[N][N];
 	char best_heights[N][N];
-	char cardinal_x[N];
-	char max_z;
-	char card;
-	char best_card;
+	N_INDEX cardinal_x[N];
+	N_INDEX max_z;
+	N_INDEX card;
+	N_INDEX best_card;
 	void print_config();
 	void update_best();
 } Config;
@@ -115,7 +115,7 @@ struct Worker_next<true, on_initial_column, true> final {
 	static void backtrack_next(Config * c, N_INDEX i, N_INDEX j) {
 		OPTIM4_INITIAL_LINE();
 
-		// TODO: refactor into yet another kind of Worker
+		// TODO: refactor
 		/* Should we change slice ? */
 		if (j == 0) {
 			Worker<false, true>::backtrack(c, i-1, N-1);
@@ -182,6 +182,7 @@ void Worker<on_initial_line, on_initial_column>::backtrack_pillar(Config * c,
 
 #if R_OPTIM3
 	/* Optimisation: only use heights in order */
+	// TODO: directly store a max_mask instead ?
 	max_k = c->max_z;
 #else
 	max_k = N;
@@ -220,6 +221,7 @@ void Worker<on_initial_line, on_initial_column>::backtrack_pillar(Config * c,
 			Worker_next<on_initial_line, on_initial_column, false
 				>::backtrack_next(c, i, j);
 			c->max_z--;
+			// TODO: we know this is the last iteration of the loop
 		} else
 #endif
 			Worker_next<on_initial_line, on_initial_column, false
@@ -265,7 +267,7 @@ void Config::print_config() {
 		}
 		printf("\n");
 	}
-	printf("result: %i | %i\n\n", card, best_card);
+	printf("result: %zu | %zu\n\n", card, best_card);
 }
 
 void Config::update_best() {
@@ -276,7 +278,7 @@ void Config::update_best() {
 	}
 	best_card = card;
 #if ROOKS_PRINT
-	printf("----- BEST ! ----- %i\n", card);
+	printf("----- BEST ! ----- %zu\n", card);
 	print_config();
 #endif
 }
