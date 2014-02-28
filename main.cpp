@@ -66,6 +66,14 @@ inline void print_counter(void) {}
 #endif
 
 #if R_OPTIM4
+#define OPTIM4() do { \
+		/* Do we have a chance at beating the record ? */ \
+		int max_available_slots = c->cardinal_x[i+1]*i + j; \
+		if (c->card + max_available_slots <= c->best_card) { \
+			update_counter(4); \
+			return; \
+		} \
+	} while (0)
 #define OPTIM4_INITIAL_LINE() do { \
 		/* Do we have a chance at beating the record ? */ \
 		if (N*(c->card + j) <= c->best_card) { \
@@ -74,6 +82,7 @@ inline void print_counter(void) {}
 		} \
 	} while(0)
 #else
+#define OPTIM4() do {} while(0)
 #define OPTIM4_INITIAL_LINE() do {} while(0)
 #endif
 
@@ -127,19 +136,31 @@ struct Worker_next<true, on_initial_column, false> final {
 };
 template<>
 struct Worker_next<false, true, true> final {
-	static void backtrack_next(Config * c, N_INDEX, N_INDEX);
+	static void backtrack_next(Config * c, N_INDEX i, N_INDEX j) {
+		Worker<false, false>::backtrack(c, i, j-1);
+	}
 };
 template<>
 struct Worker_next<false, true, false> final {
-	static void backtrack_next(Config * c, N_INDEX, N_INDEX);
+	static void backtrack_next(Config * c, N_INDEX i, N_INDEX j) {
+		Worker<false, false>::backtrack(c, i, j-1);
+	}
 };
 template<>
 struct Worker_next<false, false, true> final {
-	static void backtrack_next(Config * c, N_INDEX, N_INDEX);
+	static void backtrack_next(Config * c, N_INDEX i, N_INDEX j) {
+		OPTIM4();
+		recurse(c, i, j);
+	}
 };
 template<>
 struct Worker_next<false, false, false> final {
-	static void backtrack_next(Config * c, N_INDEX, N_INDEX);
+	static void backtrack_next(Config * c, N_INDEX i, N_INDEX j) {
+		OPTIM1(c, i, j);
+		OPTIM6(c, i, j);
+		OPTIM2(c, i, j);
+		recurse(c, i, j);
+	}
 };
 
 inline void __attribute__((always_inline))
@@ -318,47 +339,7 @@ void Config::update_best() {
 #endif
 }
 
-void Worker_next<false, true, false>::backtrack_next(Config * c,
-		N_INDEX i, N_INDEX j) {
-	Worker<false, false>::backtrack(c, i, j-1);
-}
 
-void Worker_next<false, false, false>::backtrack_next(Config * c,
-		N_INDEX i, N_INDEX j) {
-#if R_OPTIM1
-	if (c->cardinal_x[i] > c->cardinal_x[i+1]) {
-		update_counter(1);
-		return;
-	}
-#endif
-#if R_OPTIM6
-	if (c->cardinal_x[i] == c->cardinal_x[i+1]
-			&& c->proj_y_x[i] > c->proj_y_x[i+1]) {
-		update_counter(6);
-		return;
-	}
-#endif
-	OPTIM2(c, i, j);
-	recurse(c, i, j);
-}
-
-void Worker_next<false, true, true>::backtrack_next(Config * c,
-		N_INDEX i, N_INDEX j) {
-	Worker<false, false>::backtrack(c, i, j-1);
-}
-
-void Worker_next<false, false, true>::backtrack_next(Config * c,
-		N_INDEX i, N_INDEX j) {
-#if R_OPTIM4
-	/* Do we have a chance at beating the record ? */
-	int max_available_slots = c->cardinal_x[i+1]*i + j;
-	if (c->card + max_available_slots <= c->best_card) {
-		update_counter(4);
-		return;
-	}
-#endif
-	recurse(c, i, j);
-}
 
 void * monitor(void *c) {
 	for(;;) {
