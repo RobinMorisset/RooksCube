@@ -37,6 +37,7 @@ compile time.
 One translation unit, no build system, and **everything is a compile-time
 option** — `main()` ignores `argc`/`argv`. `N` has no default and must be
 given, because the state is sized and the recursion unrolled at compile time.
+It must be at most 30, which the build enforces; see Known issues for why.
 
 The recommended configuration:
 
@@ -151,7 +152,8 @@ correctness-preserving combination of the options that was tried, including
    reports *shift exponent 32 is too large*, while `N = 28, 29, 30` are clean.
    Both fire with `R_OPTIM3` as well, once `max_z` has climbed that far.
    Writing the shifts as `(N_BITFIELD) 1 << …` would raise the ceiling to 31.
-   Runtime is the real limit long before either, so this is theoretical.
+   Runtime is the real limit long before either, so this is theoretical —
+   `N > 30` is now rejected at compile time rather than fixed.
    `N_BITFIELD2` is declared but unused.
 3. ~~**The combination of symmetry breakers is not formally justified
    here.**~~ **Settled: `R_OPTIM1`, `R_OPTIM2`, `R_OPTIM3` and `R_OPTIM6` do

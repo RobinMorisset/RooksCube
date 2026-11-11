@@ -10,6 +10,16 @@
 #define N_INDEX size_t
 #define FFS_BITFIELD(x) __builtin_ffs(x)
 
+/* The projections are N_BITFIELD, but the masks are built by shifting int:
+ * (1 << max_k) - 1, where max_k reaches N. At N = 31 that makes 1 << 31 give
+ * INT_MIN and the - 1 then overflow; at N = 32 the shift exponent is too large
+ * outright. Both are undefined behaviour, as UBSan confirms, so cap N at 30.
+ * Casting the shifts to N_BITFIELD would raise this to 31; nothing beyond
+ * N = 9 is reachable in practice anyway. */
+#if N > 30
+#error "N must be at most 30: beyond that the int shifts used to build the height masks overflow."
+#endif
+
 /* R_OPTIM4 and R_OPTIM6 are both stated relative to the slice ordering that
  * R_OPTIM1 establishes, so neither is meaningful on its own. R_OPTIM4's bound
  * (cardinal_x[i+1]*i + j) is an upper bound only because R_OPTIM1 guarantees
