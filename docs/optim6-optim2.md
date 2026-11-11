@@ -222,12 +222,20 @@ Sections 1–4 settle the mathematics. What they do not exercise is the actual
 incremental bookkeeping in `main.cpp`, which Lemma 1 covers only on paper, so
 it is worth checking against the running solver.
 
-`docs/dump_optima.sh` builds a copy of `main.cpp` with `update_best()`
-replaced by `print_config()` — so `best_card` never moves off `R_MIN - 1` and
-*every* configuration reaching the optimum is printed, not only the improving
-ones — and dumps all optima twice: once with `R_OPTIM3` alone (no `x`/`y`
-symmetry breaking at all, and no `R_OPTIM4` either, since its bound needs
-`R_OPTIM1`), and once with `R_OPTIM1` + `R_OPTIM2` + `R_OPTIM3` + `R_OPTIM6`.
+`docs/dump_optima.sh` builds a copy of `main.cpp` with the "is this a new
+best" test replaced by "does this reach `DUMP_MIN` rooks" and `update_best()`
+by `print_config()` — so `best_card` never moves and *every* configuration
+reaching the optimum is printed, not only the improving ones — and dumps all
+optima twice: once with `R_OPTIM3` alone (no `x`/`y` symmetry breaking at all,
+and no `R_OPTIM4` either, since its bound needs `R_OPTIM1`), and once with
+`R_OPTIM1` + `R_OPTIM2` + `R_OPTIM3` + `R_OPTIM6`.
+
+The threshold deliberately does not go through `R_MIN`. `R_MIN` only seeds
+`best_card`, which nothing but `R_OPTIM4` consults for pruning, so it would
+not have bounded these runs in any case — and `main.cpp` now refuses to build
+`R_MIN` without `R_OPTIM4`, whose bound needs `R_OPTIM1`, which is exactly the
+symmetry breaking the ground-truth run must not have. Both runs are therefore
+full searches, which is the real reason `N = 6` is out of reach below.
 `docs/orbits.py` then validates every dumped configuration against the two
 problem constraints, written out from scratch, groups the ground truth into
 orbits, and checks that the symmetry-broken dump covers every orbit. The
