@@ -37,6 +37,15 @@
 #error "R_MAX requires R_OPTIM5: its bound holds only if every slice ends within one rook of cardinal_x[N-1]."
 #endif
 
+/* R_MIN only seeds best_card. Outside R_OPTIM4 nothing consults best_card but
+ * the "is this a new best" test, so without R_OPTIM4 it prunes nothing at all:
+ * it merely hides the configurations below the threshold, at the full cost of
+ * the search. Note the test below is defined(), not the value: R_MIN is gated
+ * with #ifndef in main(), so -DR_MIN=0 is active too. */
+#if defined(R_MIN) && !R_OPTIM4
+#error "R_MIN requires R_OPTIM4: on its own it seeds best_card without pruning anything."
+#endif
+
 #if R_COUNTER
 int counter[7];
 inline void update_counter(size_t i) {counter[i]++;}

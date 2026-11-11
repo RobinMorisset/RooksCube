@@ -84,7 +84,7 @@ Every option is off unless defined to a true value. All of them are plain
 
 | Macro | Effect |
 | --- | --- |
-| `R_MIN=k` | Start from `best_card = k - 1`, i.e. only look for configurations with at least `k` rooks. Makes `R_OPTIM4` far more effective. If nothing is printed, no configuration with `k` or more rooks exists. |
+| `R_MIN=k` | Start from `best_card = k - 1`, i.e. only look for configurations with at least `k` rooks. Makes `R_OPTIM4` far more effective. If nothing is printed, no configuration with `k` or more rooks exists. **Requires `R_OPTIM4`**, enforced at compile time: `R_OPTIM4` is the only thing that consults `best_card` for pruning, so on its own `R_MIN` costs a full search and merely hides the configurations below `k`. Use `k ≥ 1`; `R_MIN=0` underflows `best_card` to `SIZE_MAX` and the run prints nothing at all. |
 | `R_MAX=k` | Prune branches projected to exceed `k` rooks, i.e. cap the search from above. Together with `R_MIN` this carves the search space into bands that could be run in parallel. **Requires `R_OPTIM5`**, enforced at compile time: it prunes on `(cardinal_x[N-1]-1)*i + card`, which bounds from below what a subtree can still reach only if every slice ends within one rook of `cardinal_x[N-1]` — exactly what `R_OPTIM5` enforces. So `R_MAX` inherits `R_OPTIM5`'s unproved lemma, and a run that uses it is not a proof. |
 
 Measured at `N=8`, whose optimum is 32, `-O3 -march=native` with `R_OPTIM1`,
