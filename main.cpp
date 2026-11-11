@@ -46,6 +46,22 @@
 #error "R_MIN requires R_OPTIM4: on its own it seeds best_card without pruning anything."
 #endif
 
+/* Degenerate thresholds. Both count rooks, so both must be at least 1, and
+ * neither fails loudly on its own: R_MIN = 0 makes best_card = R_MIN - 1
+ * underflow to SIZE_MAX, so nothing ever beats it and the run prints nothing
+ * at all -- indistinguishable from the legitimate "no configuration reaches
+ * R_MIN" answer. R_MAX = 0 is gated with #if R_MAX at its use site, so rather
+ * than capping the search at zero it switches the cap off altogether; a
+ * negative R_MAX compiles the test in but converts to a huge size_t, so the
+ * cap never fires either. Both tests are defined()-based, since it is the
+ * value and not its presence that is wrong. */
+#if defined(R_MIN) && R_MIN < 1
+#error "R_MIN must be at least 1: anything less underflows best_card to a huge size_t, and the run then prints nothing."
+#endif
+#if defined(R_MAX) && R_MAX < 1
+#error "R_MAX must be at least 1: anything less does not cap the search low, it switches the cap off."
+#endif
+
 #if R_COUNTER
 int counter[7];
 inline void update_counter(size_t i) {counter[i]++;}
