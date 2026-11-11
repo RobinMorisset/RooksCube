@@ -128,14 +128,23 @@ correctness-preserving combination of the options that was tried, including
 2. **`N ≤ 31`.** The projections are `uint32_t` and the code does `1 << i` on
    `int`, so `N = 32` would overflow. Runtime is the real limit long before
    that. `N_BITFIELD2` is declared but unused.
-3. **The combination of symmetry breakers is not formally justified here.**
-   `R_OPTIM1` (sort `x`-slices by cardinality), `R_OPTIM2` (sort `y`-slices by
-   projection) and `R_OPTIM3` (heights in order) act on independent factors of
-   the symmetry group and do compose: a `y`-permutation leaves `cardinal_x[]`
-   untouched, and a `z`-permutation leaves both alone. `R_OPTIM6`, however,
-   breaks ties in the `x`-ordering using `proj_y_x[]`, which a
-   `y`-permutation does change, so its interaction with `R_OPTIM2` deserves a
-   proof rather than the empirical agreement up to `N = 8` reported above.
+3. ~~**The combination of symmetry breakers is not formally justified
+   here.**~~ **Settled: `R_OPTIM1`, `R_OPTIM2`, `R_OPTIM3` and `R_OPTIM6` do
+   compose, for every `N`.** The doubt was about `R_OPTIM6`, which breaks ties
+   in the `x`-ordering using `proj_y_x[]` — a quantity that a `y`-permutation,
+   and hence `R_OPTIM2`, does change. [`docs/optim6-optim2.md`][o62] reduces
+   the four of them to a statement about 0/1 matrices and proves it: every
+   `N × N` 0/1 matrix admits a row and a column permutation for which the rows
+   are sorted by `(cardinality, row-as-integer)` and the columns by
+   `column-as-integer` *at the same time*, because row sums are invariant under
+   column permutations and `sum M[i][j] 2^(i+j)` is then a monovariant. The
+   statement was also verified exhaustively for every 0/1 matrix up to
+   `N = 6`, and the solver was checked at `N = 4` and `N = 5` to still reach
+   every orbit of optimal configurations. So no reference value is affected and
+   nothing has to be dropped. Still open, and unrelated: `R_OPTIM4`'s
+   dependency on `R_OPTIM1` (see the table above) and `R_OPTIM5`'s lemma.
+
+[o62]: docs/optim6-optim2.md
 
 ## The removed `R_OPTIM1` skip-ahead
 
