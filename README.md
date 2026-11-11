@@ -38,14 +38,15 @@ One translation unit, no build system, and **everything is a compile-time
 option** — `main()` ignores `argc`/`argv`. `N` has no default and must be
 given, because the state is sized and the recursion unrolled at compile time.
 
-The fastest configuration that is correct with the code as it stands today:
+The recommended configuration:
 
 ```bash
-g++ -std=c++11 -O3 -march=native -DNDEBUG -DN=8 -DROOKS_PRINT=1 -DR_OPTIM2=1 -DR_OPTIM3=1 -DR_OPTIM6=1 -o rooks8 main.cpp -lpthread
+g++ -std=c++11 -O3 -march=native -DNDEBUG -DN=8 -DROOKS_PRINT=1 -DR_OPTIM1=1 -DR_OPTIM2=1 -DR_OPTIM3=1 -DR_OPTIM4=1 -DR_OPTIM6=1 -o rooks8 main.cpp -lpthread
 ```
 
-Adding `-DR_OPTIM1=1 -DR_OPTIM4=1` makes it roughly 1.5× faster, but both are
-broken as committed — see [Known issues](#known-issues).
+`R_OPTIM4` is the one you cannot do without — with everything else on but
+`R_OPTIM4` off, `N = 7` does not finish in 200 s, against 0.03 s with it — and
+its bound is only valid under `R_OPTIM1`, so enable those two together.
 
 Notes:
 
@@ -70,7 +71,7 @@ Every option is off unless defined to a true value. All of them are plain
 
 | Macro | Effect | Depends on |
 | --- | --- | --- |
-| `R_OPTIM1` | Breaks the symmetry under permutation of the `x`-slices: requires the per-slice rook counts `cardinal_x[]` to be sorted. Also skips straight to the end of the current line once the count is too high. **Broken as committed.** | — |
+| `R_OPTIM1` | Breaks the symmetry under permutation of the `x`-slices: requires the per-slice rook counts `cardinal_x[]` to be sorted. | — |
 | `R_OPTIM2` | Breaks the symmetry under permutation of the `y`-slices: requires the column projections `proj_x_y[]` to be sorted. Uses the `proj_x_y[N] = ~0` sentinel to avoid a special case at `j = N-1`. | — |
 | `R_OPTIM3` | Breaks the symmetry under permutation of the heights: a height may only be used once all lower ones are, tracked by `max_z`. Biggest single win at small `N` (`N=5`: > 60 s → 2.7 s). | — |
 | `R_OPTIM4` | Branch and bound: prunes when `card` plus an upper bound on the slots still available cannot beat `best_card`. | **`R_OPTIM1`.** The bound is `cardinal_x[i+1] * i + j`, which is only an upper bound if the slices still to come are known not to be larger than slice `i+1` — that is, under `R_OPTIM1`'s sorted invariant. Without it the prune happens to reproduce the known values up to `N=8`, but it is not justified. |
@@ -99,12 +100,15 @@ Measured at `N=8`, whose optimum is 32: plain 0.96 s; `-DR_MIN=32` finds 32 in
 ## Reference values
 
 Maximum number of rooks. Times are one core of a Ryzen-class laptop under WSL,
-`-O2 -DNDEBUG`, with `R_OPTIM1` (repaired), `2`, `3`, `4` and `6`:
+`-O2 -DNDEBUG`, with `R_OPTIM1`, `2`, `3`, `4` and `6`:
 
 | `N` | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | max rooks | 1 | 2 | 6 | 9 | 12 | 18 | 22 | 32 | 36 |
-| time | — | 0.00 s | 0.00 s | 0.00 s | 0.00 s | 0.00 s | 0.04 s | 0.95 s | 7 m 28 s |
+| time | — | 0.00 s | 0.00 s | 0.00 s | 0.01 s | 0.01 s | 0.03 s | 0.90 s | 6 m 51 s |
+
+At `-O3 -march=native`, `N = 8` drops to 0.76 s; adding the unproved
+`R_OPTIM5` roughly halves it again.
 
 `N = 1 … 4` were cross-checked against an independent brute force written from
 the problem statement, which also gives `1, 2, 6, 9`. `N = 1` is not produced
@@ -114,34 +118,13 @@ correctness-preserving combination of the options that was tried, including
 
 ## Known issues
 
-1. **`R_OPTIM1` crashes for every `N ≥ 2`** — assertion `j < N`, or an
-   out-of-bounds access under `-DNDEBUG`. A regression from commit b1d4947
-   (*"Adapt the skip to also apply to optim1"*); its parent 16a46df is fine.
-   The skip-ahead added there sets `j = 0` and then dispatches through
-   `Worker_next<on_initial_line, on_initial_column, true>`, but
-   `on_initial_column` was instantiated for the *original* `j`. When it is
-   `true` (`j` was `N-1`), `Worker_next<false, true, true>::backtrack_next`
-   does `backtrack(c, i, j - 1)`, and `j - 1` underflows `size_t`. Calling
-   `recurse(c, i, j)` there instead — it already handles both the `j == 0` and
-   the `j > 0` case — fixes it and reproduces every reference value above.
-2. **Out-of-bounds read in `OPTIM1_CHECK`, and it is not benign.** The inline
-   check at `main.cpp:224` runs for every template instantiation, including
-   `on_initial_line`, where `i == N-1` and so `c->cardinal_x[i+1]` reads
-   `cardinal_x[N]` — one past the end of the array, aliasing the `max_z`
-   field. With `R_OPTIM3` on, `max_z` grows and the condition never fires, so
-   the bug stays hidden; with `R_OPTIM3` off, `max_z` stays 1 and the first
-   slice is silently capped at one rook. `R_OPTIM1 + R_OPTIM4` without
-   `R_OPTIM3` therefore returns `N` instead of the true optimum (3, 4, 5, 6
-   for `N = 3 … 6`). A `cardinal_x[N] = N` sentinel, mirroring the existing
-   `proj_x_y[N]` one, removes both the undefined behaviour and the wrong
-   answers.
-3. **`N = 1` fails the assertion `i < N`.** `recurse_initial_line` lacks the
+1. **`N = 1` fails the assertion `i < N`.** `recurse_initial_line` lacks the
    `i == 0` termination check that `recurse` has, so the initial line of a
    single-slice cube recurses to `i = -1`. The answer is 1.
-4. **`N ≤ 31`.** The projections are `uint32_t` and the code does `1 << i` on
+2. **`N ≤ 31`.** The projections are `uint32_t` and the code does `1 << i` on
    `int`, so `N = 32` would overflow. Runtime is the real limit long before
    that. `N_BITFIELD2` is declared but unused.
-5. **The combination of symmetry breakers is not formally justified here.**
+3. **The combination of symmetry breakers is not formally justified here.**
    `R_OPTIM1` (sort `x`-slices by cardinality), `R_OPTIM2` (sort `y`-slices by
    projection) and `R_OPTIM3` (heights in order) act on independent factors of
    the symmetry group and do compose: a `y`-permutation leaves `cardinal_x[]`
@@ -149,3 +132,37 @@ correctness-preserving combination of the options that was tried, including
    breaks ties in the `x`-ordering using `proj_y_x[]`, which a
    `y`-permutation does change, so its interaction with `R_OPTIM2` deserves a
    proof rather than the empirical agreement up to `N = 8` reported above.
+
+## The removed `R_OPTIM1` skip-ahead
+
+Between commits b1d4947 and HEAD, `backtrack` carried a second, inline copy of
+the `R_OPTIM1` test which, instead of simply pruning, rewrote `j` to 0 so as to
+jump straight to the end of the current line. It was removed, because:
+
+* **It was broken.** It left `j = 0` while dispatching through
+  `Worker_next<on_initial_line, on_initial_column, true>`, whose
+  `on_initial_column` had been instantiated for the *original* `j`. When that
+  was `true` (`j` was `N-1`), `Worker_next<false, true, true>` did
+  `backtrack(c, i, j - 1)` and `j - 1` underflowed `size_t`: an assertion
+  failure for every `N ≥ 2`, or an out-of-bounds access under `-DNDEBUG`.
+  b1d4947's parent 16a46df was fine.
+* **It read out of bounds.** Being inline in `backtrack`, it ran for every
+  instantiation, including `on_initial_line`, where `i == N-1` and so
+  `cardinal_x[i+1]` read `cardinal_x[N]`, one past the array, aliasing the
+  `max_z` field. With `R_OPTIM3` on, `max_z` grows and the condition never
+  fires, so the bug hid; with `R_OPTIM3` off, `max_z` stays 1 and the first
+  slice was silently capped at one rook, so `R_OPTIM1 + R_OPTIM4` returned `N`
+  instead of the optimum (3, 4, 5, 6 for `N = 3 … 6`).
+* **It bought nothing.** At `N = 8`, `-O3 -march=native`, best of ten: 0.76 s
+  without it, 0.78–0.84 s with it (repaired, in either b1d4947's or a888490's
+  form). At `N = 9`, `-O2`: 6 m 51 s without it against 7 m 28 s with it.
+  a888490 reported "sometimes > 30 percents" for turning the dispatch
+  into a `goto`, and b1d4947 reported 1% for the skip itself; neither
+  reproduces today. The likeliest explanation is a3f0fe9, which inlined
+  `backtrack_pillar` into `backtrack`, together with the `R_OPTIM2` early
+  skip from 16a46df now cutting those branches first.
+
+Deleting it reverts b1d4947, a888490 and 0716946 in effect. `R_OPTIM1` itself
+is untouched: the prune in `Worker_next<false, false, false>` is the original
+pre-b1d4947 implementation, so the symmetry break — and with it the validity
+of `R_OPTIM4`'s bound — still holds.
