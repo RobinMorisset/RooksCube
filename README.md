@@ -60,9 +60,28 @@ Notes:
   (`A` = 10).
 * `-lpthread` is only needed for `ROOKS_MONITOR`, but is harmless otherwise.
 * Drop `-DNDEBUG` while experimenting: the `assert`s at the top of `backtrack`
-  catch the index underflow that the `R_OPTIM1` bug below causes.
+  bound `i` and `j`, and they are what caught the index underflow behind the
+  `R_OPTIM1` crash that commit 4da7f69 removed.
 * Measured at `N=8`: `-O0` 2.4 s, `-O1` 1.11 s, `-Os` 1.09 s, `-O2` 0.98 s,
   `-O3` 0.94 s, `-O3 -march=native` 0.81 s. Use `-O3 -march=native`.
+
+### Sanitizers
+
+```bash
+g++ -std=c++11 -O1 -g -DN=6 -DROOKS_PRINT=1 -DR_OPTIM1=1 -DR_OPTIM2=1 -DR_OPTIM3=1 -DR_OPTIM4=1 -DR_OPTIM6=1 -fsanitize=undefined,address -fsanitize=bounds-strict -fno-sanitize-recover=all -o rooks-san main.cpp -lpthread
+```
+
+Clean, with `assert`s enabled, for `N = 2 … 7` on the recommended set and for
+every other option combination tried at `N = 4`/`N = 5`: no optimisations,
+`R_OPTIM3` alone, `R_OPTIM1` alone, `R_OPTIM2`+`3`, `R_OPTIM1`+`3`+`4`, and
+the full set with each of `R_OPTIM5`, `R_MIN`, `R_MAX` and `R_COUNTER`. All
+reported the expected optima.
+
+Two caveats on what that does *not* cover. GCC's UBSan has no
+unsigned-overflow check, so the `size_t` wrap in `(cardinal_x[N-1]-1)` when
+the first slice is empty — harmless, see the `R_MAX` row — is invisible to it.
+And neither sanitizer sees data races; use `-fsanitize=thread` for those, and
+see the `ROOKS_MONITOR` row.
 
 ## Compile-time options
 
@@ -98,7 +117,7 @@ returns 32 in 0.41 s.
 | Macro | Effect |
 | --- | --- |
 | `ROOKS_PRINT` | Print every new best configuration. See the note above for the format. |
-| `ROOKS_MONITOR` | Spawn a thread that prints the live configuration once a second. Needs `-lpthread`. |
+| `ROOKS_MONITOR` | Spawn a thread that prints the live configuration once a second. Needs `-lpthread`. It reads the `Config` with no synchronisation at all while the search mutates it, which ThreadSanitizer duly reports — 19 data races at `N=7`, against none in the same build without the monitor. Formally undefined behaviour; in practice it means a printed grid can be a torn mixture of two states. Fine for watching progress, not something to build on. |
 | `R_COUNTER` | Print, at exit, how many branches each optimisation cut. Caveats: slot 0 counts *completed* configurations, not a prune; slots 1 and 2 always read 0, because the `R_OPTIM1`/`R_OPTIM2` conditions are caught earlier by the inline `OPTIM1_CHECK`/`OPTIM2_CHECK` inside `backtrack`, which do not increment; slot 3 is never written. |
 
 ## Reference values
@@ -125,9 +144,15 @@ correctness-preserving combination of the options that was tried, including
 1. **`N = 1` fails the assertion `i < N`.** `recurse_initial_line` lacks the
    `i == 0` termination check that `recurse` has, so the initial line of a
    single-slice cube recurses to `i = -1`. The answer is 1.
-2. **`N ≤ 31`.** The projections are `uint32_t` and the code does `1 << i` on
-   `int`, so `N = 32` would overflow. Runtime is the real limit long before
-   that. `N_BITFIELD2` is declared but unused.
+2. **`N ≤ 30`.** The projections are `uint32_t`, but the shifts are done on
+   `int`: `(1 << max_k) - 1`, where `max_k` reaches `N`. UBSan confirms it —
+   `N = 31` reports *signed integer overflow: -2147483648 - 1*, because
+   `1 << 31` gives `INT_MIN` and the `- 1` then overflows, and `N = 32`
+   reports *shift exponent 32 is too large*, while `N = 28, 29, 30` are clean.
+   Both fire with `R_OPTIM3` as well, once `max_z` has climbed that far.
+   Writing the shifts as `(N_BITFIELD) 1 << …` would raise the ceiling to 31.
+   Runtime is the real limit long before either, so this is theoretical.
+   `N_BITFIELD2` is declared but unused.
 3. ~~**The combination of symmetry breakers is not formally justified
    here.**~~ **Settled: `R_OPTIM1`, `R_OPTIM2`, `R_OPTIM3` and `R_OPTIM6` do
    compose, for every `N`.** The doubt was about `R_OPTIM6`, which breaks ties
