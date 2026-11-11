@@ -23,6 +23,20 @@
 #error "R_OPTIM6 requires R_OPTIM1: it only breaks ties in the slice order that R_OPTIM1 establishes."
 #endif
 
+/* R_OPTIM5 compares every slice against cardinal_x[N-1], which is the largest
+ * slice only under R_OPTIM1's ordering; without it cardinal_x[N-1] is merely
+ * whichever slice happened to be filled first. R_MAX in turn prunes on
+ * (cardinal_x[N-1]-1)*i + card, which bounds from below what the subtree can
+ * still reach only if every slice ends within one rook of cardinal_x[N-1] --
+ * exactly what R_OPTIM5 enforces. R_MAX is therefore only as sound as
+ * R_OPTIM5, whose own lemma is unproved, so a run using R_MAX is not a proof. */
+#if R_OPTIM5 && !R_OPTIM1
+#error "R_OPTIM5 requires R_OPTIM1: it treats cardinal_x[N-1] as the largest slice, which only R_OPTIM1 guarantees."
+#endif
+#if R_MAX && !R_OPTIM5
+#error "R_MAX requires R_OPTIM5: its bound holds only if every slice ends within one rook of cardinal_x[N-1]."
+#endif
+
 #if R_COUNTER
 int counter[7];
 inline void update_counter(size_t i) {counter[i]++;}

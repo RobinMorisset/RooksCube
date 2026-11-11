@@ -78,18 +78,20 @@ Every option is off unless defined to a true value. All of them are plain
 | `R_OPTIM3` | Breaks the symmetry under permutation of the heights: a height may only be used once all lower ones are, tracked by `max_z`. Biggest single win at small `N` (`N=5`: > 60 s → 2.7 s). | — |
 | `R_OPTIM4` | Branch and bound: prunes when `card` plus an upper bound on the slots still available cannot beat `best_card`. | **`R_OPTIM1`.** The bound is `cardinal_x[i+1] * i + j`, which is only an upper bound if the slices still to come are known not to be larger than slice `i+1` — that is, under `R_OPTIM1`'s sorted invariant. Enabling it without `R_OPTIM1` is refused at compile time. |
 | `R_OPTIM6` | Tie-break for `R_OPTIM1`: when two adjacent slices have equal cardinality, orders them by `proj_y_x[]`. | **`R_OPTIM1`**, whose order it refines; enabling it alone is refused at compile time. |
-| `R_OPTIM5` | **Experimental.** Prunes any branch in which a slice's cardinality falls more than 1 below the first slice's. Rests on a lemma that was never proved (commit 25c3f8e). It reproduces the known values up to `N=8` and halves the runtime there, but results obtained with it are not proofs. | — |
+| `R_OPTIM5` | **Experimental.** Prunes any branch in which a slice's cardinality falls more than 1 below the first slice's. Rests on a lemma that was never proved (commit 25c3f8e). It reproduces the known values up to `N=8` and halves the runtime there, but results obtained with it are not proofs. | **`R_OPTIM1`** — it compares each slice against `cardinal_x[N-1]`, which is the largest slice only under `R_OPTIM1`'s ordering. Enforced at compile time. |
 
 ### Search bounds (for splitting work, or re-verifying a known value)
 
 | Macro | Effect |
 | --- | --- |
 | `R_MIN=k` | Start from `best_card = k - 1`, i.e. only look for configurations with at least `k` rooks. Makes `R_OPTIM4` far more effective. If nothing is printed, no configuration with `k` or more rooks exists. |
-| `R_MAX=k` | Prune branches projected to exceed `k` rooks, i.e. cap the search from above. Together with `R_MIN` this carves the search space into bands that could be run in parallel. |
+| `R_MAX=k` | Prune branches projected to exceed `k` rooks, i.e. cap the search from above. Together with `R_MIN` this carves the search space into bands that could be run in parallel. **Requires `R_OPTIM5`**, enforced at compile time: it prunes on `(cardinal_x[N-1]-1)*i + card`, which bounds from below what a subtree can still reach only if every slice ends within one rook of `cardinal_x[N-1]` — exactly what `R_OPTIM5` enforces. So `R_MAX` inherits `R_OPTIM5`'s unproved lemma, and a run that uses it is not a proof. |
 
-Measured at `N=8`, whose optimum is 32: plain 0.96 s; `-DR_MIN=32` finds 32 in
-0.05 s; `-DR_MIN=33` terminates in 0.03 s printing nothing, proving 32 optimal;
-`-DR_MAX=31` returns 31.
+Measured at `N=8`, whose optimum is 32, `-O3 -march=native` with `R_OPTIM1`,
+`2`, `3`, `4`, `6`: plain 0.79 s; `-DR_MIN=32` finds 32 in 0.04 s; `-DR_MIN=33`
+terminates in 0.02 s printing nothing, proving 32 optimal. Adding `R_OPTIM5`,
+as `R_MAX` requires: `-DR_MAX=31` returns 31 in 0.52 s and `-DR_MAX=32`
+returns 32 in 0.41 s.
 
 ### Instrumentation
 
