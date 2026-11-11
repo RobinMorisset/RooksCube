@@ -10,6 +10,19 @@
 #define N_INDEX size_t
 #define FFS_BITFIELD(x) __builtin_ffs(x)
 
+/* R_OPTIM4 and R_OPTIM6 are both stated relative to the slice ordering that
+ * R_OPTIM1 establishes, so neither is meaningful on its own. R_OPTIM4's bound
+ * (cardinal_x[i+1]*i + j) is an upper bound only because R_OPTIM1 guarantees
+ * that the slices still to come are no larger than slice i+1, and R_OPTIM6
+ * only breaks ties in R_OPTIM1's order. Refuse to build rather than silently
+ * prune away valid configurations. */
+#if R_OPTIM4 && !R_OPTIM1
+#error "R_OPTIM4 requires R_OPTIM1: its bound is only valid under R_OPTIM1's sorted-cardinality invariant."
+#endif
+#if R_OPTIM6 && !R_OPTIM1
+#error "R_OPTIM6 requires R_OPTIM1: it only breaks ties in the slice order that R_OPTIM1 establishes."
+#endif
+
 #if R_COUNTER
 int counter[7];
 inline void update_counter(size_t i) {counter[i]++;}

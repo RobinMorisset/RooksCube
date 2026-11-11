@@ -46,7 +46,9 @@ g++ -std=c++11 -O3 -march=native -DNDEBUG -DN=8 -DROOKS_PRINT=1 -DR_OPTIM1=1 -DR
 
 `R_OPTIM4` is the one you cannot do without — with everything else on but
 `R_OPTIM4` off, `N = 7` does not finish in 200 s, against 0.03 s with it — and
-its bound is only valid under `R_OPTIM1`, so enable those two together.
+its bound is only valid under `R_OPTIM1`, so enable those two together. The
+build enforces that: `R_OPTIM4` or `R_OPTIM6` without `R_OPTIM1` is an
+`#error`.
 
 Notes:
 
@@ -74,8 +76,8 @@ Every option is off unless defined to a true value. All of them are plain
 | `R_OPTIM1` | Breaks the symmetry under permutation of the `x`-slices: requires the per-slice rook counts `cardinal_x[]` to be sorted. | — |
 | `R_OPTIM2` | Breaks the symmetry under permutation of the `y`-slices: requires the column projections `proj_x_y[]` to be sorted. Uses the `proj_x_y[N] = ~0` sentinel to avoid a special case at `j = N-1`. | — |
 | `R_OPTIM3` | Breaks the symmetry under permutation of the heights: a height may only be used once all lower ones are, tracked by `max_z`. Biggest single win at small `N` (`N=5`: > 60 s → 2.7 s). | — |
-| `R_OPTIM4` | Branch and bound: prunes when `card` plus an upper bound on the slots still available cannot beat `best_card`. | **`R_OPTIM1`.** The bound is `cardinal_x[i+1] * i + j`, which is only an upper bound if the slices still to come are known not to be larger than slice `i+1` — that is, under `R_OPTIM1`'s sorted invariant. Without it the prune happens to reproduce the known values up to `N=8`, but it is not justified. |
-| `R_OPTIM6` | Tie-break for `R_OPTIM1`: when two adjacent slices have equal cardinality, orders them by `proj_y_x[]`. Inert on its own. | `R_OPTIM1`, to do anything |
+| `R_OPTIM4` | Branch and bound: prunes when `card` plus an upper bound on the slots still available cannot beat `best_card`. | **`R_OPTIM1`.** The bound is `cardinal_x[i+1] * i + j`, which is only an upper bound if the slices still to come are known not to be larger than slice `i+1` — that is, under `R_OPTIM1`'s sorted invariant. Enabling it without `R_OPTIM1` is refused at compile time. |
+| `R_OPTIM6` | Tie-break for `R_OPTIM1`: when two adjacent slices have equal cardinality, orders them by `proj_y_x[]`. | **`R_OPTIM1`**, whose order it refines; enabling it alone is refused at compile time. |
 | `R_OPTIM5` | **Experimental.** Prunes any branch in which a slice's cardinality falls more than 1 below the first slice's. Rests on a lemma that was never proved (commit 25c3f8e). It reproduces the known values up to `N=8` and halves the runtime there, but results obtained with it are not proofs. | — |
 
 ### Search bounds (for splitting work, or re-verifying a known value)
